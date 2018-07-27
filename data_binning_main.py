@@ -15,7 +15,7 @@ from numba import jit
 
 
 class data_binning(object):
-    def __init__(self,case='1bar',Nx=250):
+    def __init__(self,case='1bar',Nx=250,alpha,beta,befact):
 
         self.c_path = join(case,'rho_by_c.dat')
         self.rho_path = join(case,'rho.dat')
@@ -23,6 +23,11 @@ class data_binning(object):
         self.data_rho = None
         self.Nx = Nx
         self.case = case
+
+        # for reaction rates
+        self.alpha =alpha
+        self.beta = beta
+        self.bfact = befact
 
         # checks if output directory exists
         self.output_path = join(case,'output')
@@ -79,10 +84,18 @@ class data_binning(object):
         # get the density for the relevant points! it is stored in a different file!
         this_rho_reshape = self.rho_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute().reshape(self.filter_width**3)
 
+        # c without density
+        this_c_reshape= this_rho_c_reshape/this_rho_reshape
+
         this_rho_mean = this_rho_reshape.mean()
 
         # compute c_tilde: mean(rho*c)/mean(rho)
         c_tilde = this_rho_c_mean / this_rho_mean
+
+        # compute the reaction rate of each cell     Eq (2.28) Senga documentation
+        # note that for Le=1: c=T, so this_c_reshape = this_T_reshape
+        exponent = - self.beta*(1-this_c_reshape) / (1 - self.alpha*(1 - this_c_reshape))
+        this_RR_reshape = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
 
         # another criteria
         if c_tilde < 0.99:
@@ -92,9 +105,10 @@ class data_binning(object):
             data_arr[:, 1] = this_rho_mean
             data_arr[:, 2] = this_rho_c_reshape
             data_arr[:, 3] = this_rho_reshape
-            data_arr[:, 4] = int(i)
-            data_arr[:, 5] = int(j)
-            data_arr[:, 6] = int(k)
+            data_arr[:, 4] = this_RR_reshape
+            #data_arr[:, 5] = int(i)
+            #data_arr[:, 6] = int(j)
+            #data_arr[:, 7] = int(k)
             #
             data_df = pd.DataFrame(data_arr, columns=self.col_names)
             file_name = 'c_tilde_%.5f_filter_%i_%s.csv' % (c_tilde, self.filter_width, self.case)
