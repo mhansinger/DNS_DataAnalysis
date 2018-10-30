@@ -33,7 +33,7 @@ class data_binning(object):
         self.bfact = befact
 
         # checks if output directory exists
-        self.output_path = join(case,'output')
+        self.output_path = join(case,'output_test')
         if os.path.isdir(self.output_path) is False:
             os.mkdir(self.output_path)
 
@@ -148,28 +148,12 @@ class data_binning(object):
     def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
         # plot the c_tilde and c, both normalized
 
-        n_bins = self.bins
-
         c_max = 0.182363
 
         fig, (ax0, ax1) = plt.subplots(ncols=2, figsize=(10, 4))
-        ax0.hist(this_rho_c_reshape,bins=n_bins,normed=True,edgecolor='black', linewidth=0.7)
+        ax0.hist(this_rho_c_reshape,bins=self.bins,normed=True,edgecolor='black', linewidth=0.7)
         ax0.set_title('rho*c')
         ax0.set_xlim(0,c_max)
-
-        this_c_reshape = this_rho_c_reshape/this_rho_reshape
-        #ax1.hist(this_c_reshape,bins=n_bins,normed=True,edgecolor='black', linewidth=0.7)
-        ax1.set_title('c')
-        ax1.set_xlim(0,1)
-
-        ax2 = ax1.twinx()
-        color = 'r'
-        ax2.set_ylabel('Reaction Rate', color=color)
-        # ax2.scatter(this_c_reshape, this_RR_reshape_DNS,color=color,s=0.9)
-        # ax1.hist(this_RR_reshape_DNS/this_RR_reshape_DNS.max(), bins=n_bins,normed=True,color=color,alpha=0.5,edgecolor='black', linewidth=0.7)
-        ax1.hist(this_c_reshape, bins=n_bins, normed=True, edgecolor='black', linewidth=0.7)
-        ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=0.9)
-        ax2.set_ylim(0,90)
 
         # compute the mean reaction rate for the single bins
         sorted_rho_c_reshape = np.sort(this_rho_c_reshape)
@@ -184,6 +168,7 @@ class data_binning(object):
         probability_c = hist/hist.sum()
 
         RR_LES_mean = 0
+        RR_interval = 0
         counter = 0
 
         for id, val in enumerate(hist):
@@ -191,6 +176,24 @@ class data_binning(object):
             RR_LES_mean = RR_LES_mean + (RR_interval*probability_c[id])
 
             counter = counter + val
+
+        print('RR_LES_mean: ', RR_LES_mean)
+
+        ###################################
+
+        this_c_reshape = this_rho_c_reshape/this_rho_reshape
+        #ax1.hist(this_c_reshape,bins=self.bins,normed=True,edgecolor='black', linewidth=0.7)
+        ax1.set_title('c')
+        ax1.set_xlim(0,1)
+
+        ax2 = ax1.twinx()
+        color = 'r'
+        ax2.set_ylabel('Reaction Rate', color=color)
+        # ax2.scatter(this_c_reshape, this_RR_reshape_DNS,color=color,s=0.9)
+        # ax1.hist(this_RR_reshape_DNS/this_RR_reshape_DNS.max(), bins=self.bins,normed=True,color=color,alpha=0.5,edgecolor='black', linewidth=0.7)
+        ax1.hist(this_c_reshape, bins=self.bins, normed=True, edgecolor='black', linewidth=0.7)
+        ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=0.9)
+        ax2.set_ylim(0,90)
 
         #fig.tight_layout()
         plt.suptitle('c_tilde = %.3f; c_bar = %.3f; wrinkling = %.3f; RR_mean_DNS = %.2f; RR_mean_LES = %.2f\n' %
@@ -204,11 +207,11 @@ class data_binning(object):
         # plt.figure()
         # plt.title('c_tilde = %.5f' % c_tilde)
         # plt.subplot(211)
-        # plt.hist(this_rho_c_reshape,bins=n_bins,normed=True)
+        # plt.hist(this_rho_c_reshape,bins=self.bins,normed=True)
         # plt.title('rho x c')
         #
         # plt.subplot(221)
-        # plt.hist(this_rho_c_reshape/this_rho_reshape,bins=n_bins,normed=True)
+        # plt.hist(this_rho_c_reshape/this_rho_reshape,bins=self.bins,normed=True)
         # plt.title('c')
 
     @jit
@@ -271,7 +274,7 @@ class data_binning(object):
                 # print('c_tilde: ', c_tilde)
 
                 # plot the surface in the box if wrinkling > 10
-                if this_wrinkling > 200:
+                if this_wrinkling > 10:
                     file_name_3D_plot = 'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s_ISO_surface.png' % (
                     this_c_bar, this_wrinkling, self.filter_width, self.case)
 
@@ -408,7 +411,7 @@ class data_binning(object):
 if __name__ == "__main__":
 
     print('Starting 1bar case!')
-    filter_widths=[2,4,8,16,32]
+    filter_widths=[16,32]
 
     for f in filter_widths:
         bar1 = data_binning(case='1bar', Nx=250, alpha=0.81818, beta=6, befact=7361)
