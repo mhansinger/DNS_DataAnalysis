@@ -31,6 +31,11 @@ class data_binning(object):
         self.alpha =alpha
         self.beta = beta
         self.bfact = befact
+        self._c_bar = None
+        self._delta_0 = None
+        self._b_0 = None
+        self.b_plus = None
+        self.b_minus = None
 
         # checks if output directory exists
         self.output_path = join(case,'output_test')
@@ -162,8 +167,11 @@ class data_binning(object):
 
         hist, bin_edges = np.histogram(this_rho_c_reshape, bins=self.bins)
 
-        # check if dimensions are correct
-        assert hist.sum() == self.filter_width**3
+        try:
+            # check if dimensions are correct
+            assert hist.sum() == self.filter_width**3
+        except:
+            print('Check the dimensions of ')
 
         probability_c = hist/hist.sum()
 
@@ -216,7 +224,7 @@ class data_binning(object):
 
     @jit
     def compute_cbar_wrinkling(self,data_set,i,j,k,histogram):
-        # this is to compute with the wrinkling factor
+        # this is to compute with the wrinkling factor and c_bar
 
         this_rho_c_reshape = data_set.reshape(self.filter_width**3)
 
@@ -228,6 +236,7 @@ class data_binning(object):
         # c without density
         this_c_reshape = this_rho_c_reshape / this_rho_reshape
 
+        # c_bar is computed
         this_c_bar = this_c_reshape.mean()
 
         this_rho_mean = this_rho_reshape.mean()
@@ -405,6 +414,34 @@ class data_binning(object):
 
             # print("A_LES: ", this_magGrad)
             return this_magGrad_c
+
+    # added Nov. 2018: Implementation of Pfitzner's analytical boundaries
+    # getter and setter for c_Mean as a protected
+    def set_c_bar(self,c_bar):
+        self._c_bar = c_bar
+
+    def get_c_bar(self):
+        return self._c_bar
+
+    # Wait for Pfitzner's conversion into c formulation!
+
+    # compute delta_0
+    def compute_delta_0(self,b,m):
+        '''
+        :param b: usually b_0
+        :param m: steepness of the flame front; not sure how computed
+        :return: computes delta_0, needed for b_plus and b_minus
+        '''
+        self._delta_0 = (1 - (1 - b)**m) / b
+
+    def compute_b_0(self,b,Delta,m):
+        '''
+        :param b: b_bar.
+        :param Delta: this is the scaled filter width.
+        :param m: steepness of the flame front; not sure how computed
+        :return: b_0
+        '''
+
 
 
 
