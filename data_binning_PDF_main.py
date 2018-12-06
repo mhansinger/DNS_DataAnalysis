@@ -425,7 +425,6 @@ class data_binning(object):
             # print("A_LES: ", this_magGrad)
             return this_magGrad_c
 
-'''
     # added Nov. 2018: Implementation of Pfitzner's analytical boundaries
     # getter and setter for c_Mean as a protected
     def set_c_bar(self,c_bar):
@@ -473,7 +472,6 @@ class data_binning(object):
         self.compute_c_minus(c_bar)
 
         self.c_plus = (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta)-1))
-'''
 
 
 
