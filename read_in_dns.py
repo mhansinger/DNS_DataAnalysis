@@ -17,15 +17,15 @@ import dask.array as da
 
 # pfad beschreibung
 
-def read_in_dns(case='1bar',NX=250):
+def read_in_dns(case='1bar',NX=250,base_path = '/home/max/HDD2_Data/DNS_bunsen/'):
 
 
     file_name = 'dmpi_merged.dat'
 
     cbar_name = 'plot_cbar.dat'
-    file_path = '/home/max/HDD2_Data/DNS_bunsen/' + case + '/' + file_name
+    file_path = base_path + case + '/' + file_name
 
-    c_bar_path = '/home/max/HDD2_Data/DNS_bunsen/' + case + '/' + cbar_name
+    c_bar_path = base_path + case + '/' + cbar_name
 
     npoints = NX # depends on 1,5, 10 bar case
 
