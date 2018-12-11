@@ -217,7 +217,7 @@ class data_binning_PDF(object):
             # check if dimensions are correct
             assert hist.sum() == self.filter_width**3
         except:
-            print('Check the dimensions of ')
+            print('Check the filter width and histogram')
 
         probability_c = hist/hist.sum()
 
@@ -485,7 +485,7 @@ class data_binning_PDF(object):
         :param m: steepness of the flame front; not sure how computed
         :return: c_0
         '''
-        
+
         self._c_0=(1-c_bar)*np.exp(-self.delta_x/7) + (1 - np.exp(-self.delta_x/7))*(1-np.exp(-2*(1-c_bar)*self.m))
 
     def compute_c_minus(self,c_bar):
