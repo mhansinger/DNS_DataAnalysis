@@ -67,6 +67,9 @@ class data_binning_PDF(object):
         self.alpha =alpha
         self.beta = beta
 
+        # normalizing pressure
+        self.p_0 = 1
+
         # TO BE COMPUTED
         self._c_bar = None
 
@@ -359,8 +362,7 @@ class data_binning_PDF(object):
 
     @jit
     def get_A_DNS(self,i,j,k):
-        # initialize fields
-        #print('I m in!')
+        # computes the flame surface area in the DNS based on gradients of c of neighbour cells
         width = 1
 
         this_DNS_gradX = np.zeros((self.filter_width,self.filter_width,self.filter_width))
