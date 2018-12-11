@@ -3,7 +3,7 @@ This is to read in the binary data File for the high pressure bunsen data
 
 @author: mhansinger
 
-last change: 6.12.2018
+last change: 11.12.2018
 '''
 
 import numpy as np
@@ -17,35 +17,66 @@ from numba import jit
 from mayavi import mlab
 
 
-class data_binning(object):
-    def __init__(self,case='1bar', Nx=250, alpha=0.81818, beta=6, befact=7361, bins = 20):
+class data_binning_PDF(object):
+    def __init__(self, case='1bar', m=4, alpha=0.81818, beta=6, bins = 20):
+        '''
 
-        self.c_path = join(case,'rho_by_c.dat')
+        :param case:    case name: 1bar, 5bar or 10bar
+        :param alpha:   FROM REACTION RATE
+        :param beta:    FROM REACTION RATE
+        :param m:       PARAMETER FOR PFITZNER PDF
+        :param bins:    NUMBER OF HISTOGRAM BINS
+        '''
+
+        self.c_path = join(case,'rho_by_c.dat') # THIS NAME IS GIVEN BY THE OUTPUT FROM FORTRAN CODE, COULD CHANGE...
         self.rho_path = join(case,'rho.dat')
+
         self.data_c = None
         self.data_rho = None
-        self.Nx = Nx
         self.case = case
         self.bins = bins
         self.write_csv = False
 
+        if self.case=='1bar':
+            # NUMBER OF DNS CELLS IN X,Y,Z DIRECTION
+            self.Nx = 250
+            # PARAMETER FOR REACTION RATE
+            self.bfact = 7364.0
+            # REYNOLDS NUMBER
+            self.Re = 100
+            # DIMENSIONLESS DNS GRID SPACING
+            self.delta_x = 1/188
+            # PRESSURE [BAR]
+            self.p = 1
+        elif self.case=='5bar':
+            self.Nx = 560
+            self.bfact = 7128.3
+            self.Re = 500
+            self.delta_x = 1/432
+            self.p = 5
+        elif self.case=='10bar':
+            self.Nx = 795
+            self.bfact = 7128.3
+            self.Re = 1000
+            self.delta_x = 1/611
+            self.p = 10
+        else:
+            raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
+
         # for reaction rates
         self.alpha =alpha
         self.beta = beta
-        self.bfact = befact
+
+        # TO BE COMPUTED
         self._c_bar = None
-        #self._delta_0 = None
+
         self._c_0 = None
         self.c_plus = None
         self.c_minus = None
-        self.m = 4
-        print("\n m is hard coded with m=%f!\n" % self.m)
-        Re = 1000
-        Sc = 0.7
-        print("Re = %f" % Re)
-        print("Sc = %f" % Sc)
-        #print()
-        self.Delta = None
+        self.m = m
+
+        # SCHMIDT NUMBER
+        self.Sc = 0.7
 
         # checks if output directory exists
         self.output_path = join(case,'output_test')
@@ -53,6 +84,11 @@ class data_binning(object):
             os.mkdir(self.output_path)
 
         self.col_names = ['c_tilde','rho_bar','c_rho','rho','reactionRate']
+
+        print('Case: %s' % self.case)
+        print('Nr. of grid points: %i' % self.Nx)
+        print("Re = %f" % self.Re)
+        print("Sc = %f" % self.Sc)
 
     def dask_read_transform(self):
 
@@ -433,24 +469,24 @@ class data_binning(object):
     def get_c_bar(self):
         return self._c_bar
 
-    # compute delta_0
-    def get_delta_0(self,c):
+    # compute self.delta_x_0
+    def get_self.delta_x_0(self,c):
         '''
         :param c: usually c_0
         :param m: steepness of the flame front; not sure how computed
-        :return: computes delta_0, needed for c_plus and c_minus
+        :return: computes self.delta_x_0, needed for c_plus and c_minus
         '''
         return (1 - c ** self.m) / (1-c)
 
     def compute_c_0(self,c_bar):
         '''
         :param c: c_bar.
-        :param Delta: this is the scaled filter width. has to be computed!!
+        :param self.delta_x: this is the scaled filter width. has to be computed!!
         :param m: steepness of the flame front; not sure how computed
         :return: c_0
         '''
         # WAS IST Z???
-        self._c_0=(1-c_bar)*np.exp(-self.Delta/z) + (1 - np.exp(-self.Delta/z))*(1-np.exp(-2*(1-c_bar)*self.m))
+        self._c_0=(1-c_bar)*np.exp(-self.delta_x/z) + (1 - np.exp(-self.delta_x/z))*(1-np.exp(-2*(1-c_bar)*self.m))
 
     def compute_c_minus(self,c_bar):
         '''
@@ -461,8 +497,8 @@ class data_binning(object):
         self.compute_c_0(c_bar=c_bar)
         this_delta_0 = self.get_delta_0(c=(1-self._c_0))
 
-        self.c_minus = (np.exp(c_bar * this_delta_0 * (1-c_bar) * self.Delta)-1) / \
-                       (np.exp(this_delta_0 * (1-self._c_0)*self.Delta) -1)
+        self.c_minus = (np.exp(c_bar * this_delta_0 * (1-c_bar) * self.delta_x)-1) / \
+                       (np.exp(this_delta_0 * (1-self._c_0)*self.delta_x) -1)
 
     def compute_c_plus(self,c_bar):
         '''
@@ -471,7 +507,7 @@ class data_binning(object):
         # update c_minus
         self.compute_c_minus(c_bar)
 
-        self.c_plus = (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta)-1))
+        self.c_plus = (self.c_minus * np.exp(self.delta_x)) / (1 + self.c_minus*(np.exp(self.delta_x)-1))
 
 
 
@@ -481,6 +517,7 @@ if __name__ == "__main__":
     filter_widths=[16,32]
 
     for f in filter_widths:
+        # RENEW!!!
         bar1 = data_binning(case='1bar', Nx=250, alpha=0.81818, beta=6, befact=7361)
         bar1.dask_read_transform()
         print('\nRunning with filter width: %i' % f)
