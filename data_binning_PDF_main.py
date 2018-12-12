@@ -18,9 +18,10 @@ from mayavi import mlab
 
 
 class data_binning_PDF(object):
-    def __init__(self, case='1bar', m=4, alpha=0.81818, beta=6, bins = 20):
-        '''
 
+    def __init__(self, case, m, alpha, beta, bins):
+        '''
+        # CONSTRUCTOR
         :param case:    case name: 1bar, 5bar or 10bar
         :param alpha:   FROM REACTION RATE
         :param beta:    FROM REACTION RATE
@@ -28,7 +29,8 @@ class data_binning_PDF(object):
         :param bins:    NUMBER OF HISTOGRAM BINS
         '''
 
-        self.c_path = join(case,'rho_by_c.dat') # THIS NAME IS GIVEN BY THE OUTPUT FROM FORTRAN CODE, COULD CHANGE...
+        # THIS NAME IS GIVEN BY THE OUTPUT FROM FORTRAN CODE, COULD CHANGE...
+        self.c_path = join(case,'rho_by_c.dat')
         self.rho_path = join(case,'rho.dat')
 
         self.data_c = None
@@ -44,7 +46,7 @@ class data_binning_PDF(object):
             self.bfact = 7364.0
             # REYNOLDS NUMBER
             self.Re = 100
-            # DIMENSIONLESS DNS GRID SPACING
+            # DIMENSIONLESS DNS GRID SPACING, DOMAIN IS NOT UNITY
             self.delta_x = 1/188
             # PRESSURE [BAR]
             self.p = 1
@@ -60,12 +62,21 @@ class data_binning_PDF(object):
             self.Re = 1000
             self.delta_x = 1/611
             self.p = 10
+        elif self.case=='dummy_planar_flame':
+            # this is a dummy case with 50x50x50 entries!
+            print('\n################\nThis is the dummy test case!\n################\n')
+            self.Nx = 50
+            self.bfact = 7364.0
+            self.Re = 100
+            self.delta_x = 1/50
+            self.p = 1
         else:
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
 
         # for reaction rates
         self.alpha =alpha
         self.beta = beta
+        self.m = m
 
         # normalizing pressure
         self.p_0 = 1
@@ -76,7 +87,6 @@ class data_binning_PDF(object):
         self._c_0 = None
         self.c_plus = None
         self.c_minus = None
-        self.m = m
 
         # SCHMIDT NUMBER
         self.Sc = 0.7
@@ -92,6 +102,9 @@ class data_binning_PDF(object):
         print('Nr. of grid points: %i' % self.Nx)
         print("Re = %f" % self.Re)
         print("Sc = %f" % self.Sc)
+
+        # CONSTRUCTOR END
+        ########################
 
     def dask_read_transform(self):
 
@@ -472,7 +485,7 @@ class data_binning_PDF(object):
         return self._c_bar
 
     # compute self.delta_x_0
-    def get_self.delta_x_0(self,c):
+    def get_delta_x_0(self,c):
         '''
         :param c: usually c_0
         :param m: steepness of the flame front; not sure how computed
