@@ -65,10 +65,10 @@ class data_binning_PDF(object):
         elif self.case=='dummy_planar_flame':
             # this is a dummy case with 50x50x50 entries!
             print('\n################\nThis is the dummy test case!\n################\n')
-            self.Nx = 50
+            self.Nx = 100
             self.bfact = 7364.0
             self.Re = 100
-            self.delta_x = 1/50
+            self.delta_x = 1/(self.Nx/1.29)
             self.p = 1
         else:
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
@@ -533,7 +533,7 @@ if __name__ == "__main__":
 
     for f in filter_widths:
         # RENEW!!!
-        bar1 = data_binning(case='1bar', Nx=250, alpha=0.81818, beta=6, befact=7361)
+        bar1 = data_binning_PDF(case='1bar',m=4.8,  alpha=0.81818, beta=6, bins=20)
         bar1.dask_read_transform()
         print('\nRunning with filter width: %i' % f)
         bar1.run_analysis_wrinkling(filter_width=f, interval=8, histogram=True)
