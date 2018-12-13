@@ -1,6 +1,6 @@
 # Run script for the different cases
 
-from data_binning_PDF_main import data_binning_PDF
+from data_binning_PDF_simple import data_binning_PDF
 
 print('Starting dummy case!')
 filter_widths = [32]
