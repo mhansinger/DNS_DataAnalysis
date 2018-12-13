@@ -165,10 +165,12 @@ class data_binning_PDF(object):
                     # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
                     if (self.this_c_set > self.threshold).any() and (self.this_c_set < self.c_rho_max).all():
 
-                        #print('If criteria erreicht!')
+                        print('If criteria erreicht!')
                         #compute c-bar
 
-                        self.compute_cbar(i,j,k,histogram)
+                        #self.compute_cbar(i,j,k,histogram)
+                        c_bar = self.this_c_set.mean()
+                        print(c_bar)
 
     @jit
     def compute_cbar(self,i,j,k,histogram):
