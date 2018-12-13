@@ -14,7 +14,7 @@ from os.path import join
 import dask.dataframe as dd
 import dask.array as da
 from numba import jit
-from mayavi import mlab
+#from mayavi import mlab
 # to free memory
 import gc
 
@@ -150,32 +150,36 @@ class data_binning_PDF(object):
 
                     # TEST VERSION
                     # this is the current data cube which constitutes the LES cell
-                    this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    self.this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    # get the density for the relevant points! it is stored in a different file!
+                    self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                                       k - self.filter_width:k].compute()
+                    self.this_c_set = self.this_rho_c_set /self.this_rho_set
 
-                    #print(this_rho_c_set)
+                    print(self.this_c_set)
 
                     # check if threshold condition is reached
                     # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
-                    if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
+                    if (self.this_c_set > self.threshold).any() and (self.this_c_set < self.c_rho_max).all():
 
                         #print('If criteria erreicht!')
                         #compute c-bar
 
-                        self.compute_cbar(this_rho_c_set,i,j,k,histogram)
+                        self.compute_cbar(i,j,k,histogram)
 
     @jit
-    def compute_cbar(self,data_set,i,j,k,histogram):
+    def compute_cbar(self,i,j,k,histogram):
         #compute c_bar without wrinkling factor
 
-        this_rho_c_reshape = data_set.reshape(self.filter_width**3)
+        this_rho_c_reshape = self.this_rho_c_set.reshape(self.filter_width**3)
+        this_rho_reshape = self.this_rho_set.reshape(self.filter_width**3)
+
         this_rho_c_mean = this_rho_c_reshape.mean()
 
-        # get the density for the relevant points! it is stored in a different file!
-        this_rho_reshape = self.rho_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute().reshape(self.filter_width**3)
         this_rho_mean = this_rho_reshape.mean()
 
         # c without density
-        this_c_reshape = this_rho_c_reshape / this_rho_reshape
+        this_c_reshape = self.this_c_set.reshape(self.filter_width**3) #this_rho_c_reshape / this_rho_reshape
 
         # c_bar is computed
         this_c_bar = this_c_reshape.mean()
