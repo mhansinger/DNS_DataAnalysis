@@ -130,6 +130,8 @@ class data_binning_PDF(object):
 
     @jit
     def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
+        # run the analysis without computation of wrinkling factor -> planar flame (dummy case)
+
         self.filter_width  =filter_width
         self.threshold = threshold
         self.interval = interval
@@ -145,6 +147,7 @@ class data_binning_PDF(object):
 
                     # TEST VERSION
                     this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+
                     #print(this_rho_c_set)
 
                     # check if threshold condition is reached
@@ -152,15 +155,22 @@ class data_binning_PDF(object):
 
                         #print('If criteria erreicht!')
                         #compute c-bar
+
                         self.compute_cbar(this_rho_c_set,i,j,k,histogram)
+
 
     @jit
     def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True, write_csv=False):
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+
         self.write_csv = write_csv
         self.filter_width  =filter_width
         self.threshold = threshold
         self.interval = interval
         self.c_rho_max = c_rho_max
+
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta = self.Sc * self.Re / np.sqrt(self.p/self.p_0) * self.delta_x * self.filter_width
 
         count = 0
         for k in range(self.filter_width-1,self.Nx,self.interval):
@@ -168,7 +178,7 @@ class data_binning_PDF(object):
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
 
                     # TEST VERSION
-                    this_rho_c_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
 
                     # check if threshold condition is reached
                     if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
@@ -178,6 +188,7 @@ class data_binning_PDF(object):
 
     @jit
     def compute_cbar(self,data_set,i,j,k,histogram):
+        #compute c_bar without wrinkling factor
 
         this_rho_c_reshape = data_set.reshape(self.filter_width**3)
         this_rho_c_mean = this_rho_c_reshape.mean()
@@ -219,15 +230,18 @@ class data_binning_PDF(object):
             #############################################
             # computation of the integration boundaries
             self.compute_c_minus(this_c_bar)
-            self.compute_c_minus(this_c_bar)
+            self.compute_c_plus(this_c_bar)
+            print('c_plus: ',self.c_plus)
             #############################################
 
             if self.write_csv:
                 data_df.to_csv(join(self.output_path, file_name), index=False)
 
             if histogram:
-                self.plot_histograms(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,this_rho_reshape=this_rho_reshape,
-                                     c_bar = this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
+                #self.plot_histograms(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,this_rho_reshape=this_rho_reshape,
+                #                     c_bar = this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
+                self.plot_histograms_intervals(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,
+                                               this_rho_reshape=this_rho_reshape,c_bar=this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
 
 
     def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
@@ -289,7 +303,7 @@ class data_binning_PDF(object):
         fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (c_bar, wrinkling,self.filter_width, self.case))
         plt.savefig(fig_name)
 
-        print('c_tilde: ', c_tilde)
+        print('c_bar: ', c_bar)
         print(' ')
 
         # plt.figure()
@@ -359,7 +373,7 @@ class data_binning_PDF(object):
         fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (c_bar, wrinkling,self.filter_width, self.case))
         plt.savefig(fig_name)
 
-        print('c_tilde: ', c_tilde)
+        print('c_bar: ', c_bar)
         print(' ')
 
 
@@ -462,7 +476,7 @@ class data_binning_PDF(object):
         this_DNS_gradZ = this_DNS_gradX.copy()
         this_DNS_magGrad_c = this_DNS_gradX.copy()
 
-        this_rho_c_data = self.c_data_da[i -(self.filter_width+1):(i + 1), (j - 1) - self.filter_width:(j + 1),
+        this_rho_c_data = self.rho_c_data_da[i -(self.filter_width+1):(i + 1), (j - 1) - self.filter_width:(j + 1),
                       k - (self.filter_width+1):(k + 1)].compute()
 
         this_rho_data = self.rho_data_da[(i - 1) - self.filter_width:(i + 1), (j - 1) - self.filter_width:(j + 1),
@@ -518,19 +532,19 @@ class data_binning_PDF(object):
                             k - 2 * self.filter_width:k - self.filter_width].compute()
 
             # get the neighbour c data
-            this_c_west = self.c_data_da[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
+            this_c_west = self.rho_c_data_da[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
                           k - self.filter_width:k].compute() / this_rho_west
-            this_c_east = self.c_data_da[i - self.filter_width:i, j:j + self.filter_width,
+            this_c_east = self.rho_c_data_da[i - self.filter_width:i, j:j + self.filter_width,
                           k - self.filter_width:k].compute() / this_rho_east
 
-            this_c_north = self.c_data_da[i:i + self.filter_width, j - self.filter_width:j,
+            this_c_north = self.rho_c_data_da[i:i + self.filter_width, j - self.filter_width:j,
                            k - self.filter_width:k].compute() / this_rho_north
-            this_c_south = self.c_data_da[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
+            this_c_south = self.rho_c_data_da[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
                            k - self.filter_width:k].compute() / this_rho_south
 
-            this_c_up = self.c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            this_c_up = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
                         k:k + self.filter_width].compute() / this_rho_up
-            this_c_down = self.c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            this_c_down = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
                           k - 2 * self.filter_width:k - self.filter_width].compute() / this_rho_down
 
             # now computing the gradients
