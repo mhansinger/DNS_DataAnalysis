@@ -3,7 +3,7 @@ This is to read in the binary data File for the high pressure bunsen data
 
 @author: mhansinger
 
-last change: 11.12.2018
+last change: 13.12.2018
 '''
 
 import numpy as np
@@ -39,6 +39,9 @@ class data_binning_PDF(object):
         self.bins = bins
         self.write_csv = False
 
+        # Filter width of the LES cell: is filled later
+        self.filter_width = None
+
         if self.case=='1bar':
             # NUMBER OF DNS CELLS IN X,Y,Z DIRECTION
             self.Nx = 250
@@ -65,7 +68,7 @@ class data_binning_PDF(object):
         elif self.case=='dummy_planar_flame':
             # this is a dummy case with 50x50x50 entries!
             print('\n################\nThis is the dummy test case!\n################\n')
-            self.Nx = 100
+            self.Nx = 150
             self.bfact = 7364.0
             self.Re = 100
             self.delta_x = 1/188
@@ -74,7 +77,7 @@ class data_binning_PDF(object):
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
 
         # for reaction rates
-        self.alpha =alpha
+        self.alpha = alpha
         self.beta = beta
         self.m = m
 
@@ -90,6 +93,9 @@ class data_binning_PDF(object):
 
         # SCHMIDT NUMBER
         self.Sc = 0.7
+
+        # DELTA: NORMALIZED FILTERWIDTH
+        self.Delta = None # --> is computed in self.run_analysis !
 
         # checks if output directory exists
         self.output_path = join(case,'output_test')
@@ -109,7 +115,7 @@ class data_binning_PDF(object):
     def dask_read_transform(self):
 
         try:
-            self.data_c = dd.read_csv(self.c_path,names=['rho_c'])
+            self.data_rho_c = dd.read_csv(self.c_path,names=['rho_c'])
         except:
             print('No data for C_rho')
 
@@ -120,14 +126,17 @@ class data_binning_PDF(object):
 
         # transform the data into an array and reshape
         self.rho_data_da = da.asarray(self.data_rho).reshape(self.Nx,self.Nx,self.Nx)
-        self.c_data_da = da.asarray(self.data_c).reshape(self.Nx,self.Nx,self.Nx)
+        self.rho_c_data_da = da.asarray(self.data_rho_c).reshape(self.Nx,self.Nx,self.Nx)
 
     @jit
-    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.05, c_rho_max = 0.1818,histogram=True ):
+    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
         self.filter_width  =filter_width
         self.threshold = threshold
         self.interval = interval
         self.c_rho_max = c_rho_max
+
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta = self.Sc * self.Re / np.sqrt(self.p/self.p_0) * self.delta_x * self.filter_width
 
         count = 0
         for k in range(self.filter_width-1,self.Nx,self.interval):
@@ -135,16 +144,18 @@ class data_binning_PDF(object):
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
 
                     # TEST VERSION
-                    this_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    #print(this_rho_c_set)
 
                     # check if threshold condition is reached
-                    if (this_set > self.threshold).any() and (this_set < self.c_rho_max).all():
+                    if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
 
+                        #print('If criteria erreicht!')
                         #compute c-bar
-                        self.compute_cbar(this_set,i,j,k,histogram)
+                        self.compute_cbar(this_rho_c_set,i,j,k,histogram)
 
     @jit
-    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.05, c_rho_max = 0.1818,histogram=True, write_csv=False):
+    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True, write_csv=False):
         self.write_csv = write_csv
         self.filter_width  =filter_width
         self.threshold = threshold
@@ -157,13 +168,13 @@ class data_binning_PDF(object):
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
 
                     # TEST VERSION
-                    this_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    this_rho_c_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
 
                     # check if threshold condition is reached
-                    if (this_set > self.threshold).any() and (this_set < self.c_rho_max).all():
+                    if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
 
                         #compute c-bar
-                        self.compute_cbar_wrinkling(this_set,i,j,k,histogram)
+                        self.compute_cbar_wrinkling(this_rho_c_set,i,j,k,histogram)
 
     @jit
     def compute_cbar(self,data_set,i,j,k,histogram):
@@ -173,11 +184,13 @@ class data_binning_PDF(object):
 
         # get the density for the relevant points! it is stored in a different file!
         this_rho_reshape = self.rho_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute().reshape(self.filter_width**3)
+        this_rho_mean = this_rho_reshape.mean()
 
         # c without density
-        this_c_reshape= this_rho_c_reshape/this_rho_reshape
+        this_c_reshape = this_rho_c_reshape / this_rho_reshape
 
-        this_rho_mean = this_rho_reshape.mean()
+        # c_bar is computed
+        this_c_bar = this_c_reshape.mean()
 
         # compute c_tilde: mean(rho*c)/mean(rho)
         c_tilde = this_rho_c_mean / this_rho_mean
@@ -203,14 +216,19 @@ class data_binning_PDF(object):
             data_df = pd.DataFrame(data_arr, columns=self.col_names)
             file_name = 'c_tilde_%.5f_filter_%i_%s.csv' % (c_tilde, self.filter_width, self.case)
 
+            #############################################
+            # computation of the integration boundaries
+            self.compute_c_minus(this_c_bar)
+            self.compute_c_minus(this_c_bar)
+            #############################################
+
             if self.write_csv:
                 data_df.to_csv(join(self.output_path, file_name), index=False)
 
             if histogram:
                 self.plot_histograms(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,this_rho_reshape=this_rho_reshape,
-                                     this_RR_reshape_DNS=this_RR_reshape_DNS)
-                #self.plot_histograms()
-            #print('c_tilde: ', c_tilde)
+                                     c_bar = this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
+
 
     def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
         # plot the c_tilde and c, both normalized
@@ -283,6 +301,67 @@ class data_binning_PDF(object):
         # plt.subplot(221)
         # plt.hist(this_rho_c_reshape/this_rho_reshape,bins=self.bins,normed=True)
         # plt.title('c')
+
+
+    def plot_histograms_intervals(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
+        # plot c, RR, and integration boundaries c_plus, c_minus
+
+        c_max = 0.182363
+
+        fig, (ax1) = plt.subplots(ncols=1, figsize=(10, 4))
+        # ax0.hist(this_rho_c_reshape,bins=self.bins,normed=True,edgecolor='black', linewidth=0.7)
+        # ax0.set_title('rho*c')
+        # ax0.set_xlim(0,c_max)
+
+        # compute the mean reaction rate for the single bins
+        sorted_rho_c_reshape = np.sort(this_rho_c_reshape)
+        idx = np.unravel_index(np.argsort(this_rho_c_reshape, axis=None), this_rho_c_reshape.shape)
+        sorted_RR_reshape_DNS = np.array([x for y, x in sorted(zip(this_rho_c_reshape,this_RR_reshape_DNS))])
+
+        hist, bin_edges = np.histogram(this_rho_c_reshape/this_rho_reshape, bins=self.bins)
+
+        try:
+            # check if dimensions are correct
+            assert hist.sum() == self.filter_width**3
+        except:
+            print('Check the filter width and histogram')
+
+        probability_c = hist/hist.sum()
+
+        RR_LES_mean = 0
+        RR_interval = 0
+        counter = 0
+
+        for id, val in enumerate(hist):
+            RR_interval = sorted_RR_reshape_DNS[counter:counter+val].mean()
+            RR_LES_mean = RR_LES_mean + (RR_interval*probability_c[id])
+
+            counter = counter + val
+
+        #print('RR_LES_mean: ', RR_LES_mean)
+
+        ###################################
+
+        this_c_reshape = this_rho_c_reshape/this_rho_reshape
+        ax1.set_title('c')
+        ax1.set_xlim(0,1)
+
+        ax2 = ax1.twinx()
+        color = 'r'
+        ax2.set_ylabel('Reaction Rate', color=color)
+        ax1.hist(this_c_reshape, bins=self.bins, normed=True, edgecolor='black', linewidth=0.7)
+        ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=0.9)
+        ax2.set_ylim(0,90)
+
+        #fig.tight_layout()
+        plt.suptitle('c_bar = %.3f;  RR_mean_DNS = %.2f; c_plus = %.2f; c_minus = %.2f \n' %
+                     (c_bar,this_RR_reshape_DNS.mean(),self.c_plus,self.c_minus))
+        fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (c_bar, wrinkling,self.filter_width, self.case))
+        plt.savefig(fig_name)
+
+        print('c_tilde: ', c_tilde)
+        print(' ')
+
 
     @jit
     def compute_cbar_wrinkling(self,data_set,i,j,k,histogram):
@@ -411,7 +490,7 @@ class data_binning_PDF(object):
 
     @jit
     def get_A_LES(self,this_cbar,i,j,k):
-        # computes the filtered iso surface
+        # computes the filtered iso surface area
 
         if i - self.filter_width < 0 or j - self.filter_width < 0 or k - self.filter_width < 0:
             print("too small!")
@@ -485,7 +564,7 @@ class data_binning_PDF(object):
         return self._c_bar
 
     # compute self.delta_x_0
-    def get_delta_x_0(self,c):
+    def get_delta_0(self,c):
         '''
         :param c: usually c_0
         :param m: steepness of the flame front; not sure how computed
@@ -496,12 +575,12 @@ class data_binning_PDF(object):
     def compute_c_0(self,c_bar):
         '''
         :param c: c_bar.
-        :param self.delta_x: this is the scaled filter width. has to be computed!!
+        :param self.Delta: this is the scaled filter width. -> is ocmputed before
         :param m: steepness of the flame front; not sure how computed
         :return: c_0
         '''
 
-        self._c_0=(1-c_bar)*np.exp(-self.delta_x/7) + (1 - np.exp(-self.delta_x/7))*(1-np.exp(-2*(1-c_bar)*self.m))
+        self._c_0=(1-c_bar)*np.exp(-self.Delta/7) + (1 - np.exp(-self.Delta/7))*(1-np.exp(-2*(1-c_bar)*self.m))
 
     def compute_c_minus(self,c_bar):
         '''
@@ -509,11 +588,11 @@ class data_binning_PDF(object):
         :return: self.c_minus
         '''
         # update c_0 and delta_0
-        self.compute_c_0(c_bar=c_bar)
+        self.compute_c_0(c_bar = c_bar)
         this_delta_0 = self.get_delta_0(c=(1-self._c_0))
 
-        self.c_minus = (np.exp(c_bar * this_delta_0 * (1-c_bar) * self.delta_x)-1) / \
-                       (np.exp(this_delta_0 * (1-self._c_0)*self.delta_x) -1)
+        self.c_minus = (np.exp(c_bar * this_delta_0 * (1-c_bar) * self.Delta)-1) / \
+                       (np.exp(this_delta_0 * (1-self._c_0)*self.Delta) -1)
 
     def compute_c_plus(self,c_bar):
         '''
@@ -522,22 +601,22 @@ class data_binning_PDF(object):
         # update c_minus
         self.compute_c_minus(c_bar)
 
-        self.c_plus = (self.c_minus * np.exp(self.delta_x)) / (1 + self.c_minus*(np.exp(self.delta_x)-1))
+        self.c_plus = (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta)-1))
 
 
 
-if __name__ == "__main__":
-
-    print('Starting 1bar case!')
-    filter_widths=[16,32]
-
-    for f in filter_widths:
-        # RENEW!!!
-        bar1 = data_binning_PDF(case='1bar',m=4.8,  alpha=0.81818, beta=6, bins=20)
-        bar1.dask_read_transform()
-        print('\nRunning with filter width: %i' % f)
-        bar1.run_analysis_wrinkling(filter_width=f, interval=8, histogram=True)
-        del bar1
+# if __name__ == "__main__":
+#
+#     print('Starting 1bar case!')
+#     filter_widths=[16,32]
+#
+#     for f in filter_widths:
+#         # RENEW!!!
+#         bar1 = data_binning_PDF(case='1bar',m=4.8,  alpha=0.81818, beta=6, bins=20)
+#         bar1.dask_read_transform()
+#         print('\nRunning with filter width: %i' % f)
+#         bar1.run_analysis_wrinkling(filter_width=f, interval=8, histogram=True)
+#         del bar1
 
 
 
