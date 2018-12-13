@@ -68,7 +68,7 @@ class data_binning_PDF(object):
             self.Nx = 100
             self.bfact = 7364.0
             self.Re = 100
-            self.delta_x = 1/(self.Nx/1.29)
+            self.delta_x = 1/188
             self.p = 1
         else:
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')

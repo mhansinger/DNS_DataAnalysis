@@ -1,4 +1,5 @@
-# this is simpy to create a planar dummy flame for testing
+# this is simply to create a planar dummy flame for code validation
+# is created from 1bar case
 
 # @author: mhansinger
 # last modified: 12.12.18
@@ -21,7 +22,6 @@ rho_by_c_1bar_3D = rho_by_c_1bar.values.reshape(250,250,250)
 
 rho_by_c_dummy = rho_by_c_1bar_3D.copy()
 rho_dummy = rho_1bar_3D.copy()
-
 
 # get the min and max values
 rho_min = float(rho_1bar.min())
@@ -54,14 +54,54 @@ for i in range(profile_len):
     rho_dummy[:, :, i + start_id] = rho_profile[i]
 
 # VERYFY WITH A PLOT
+plt.close('all')
+
 plt.figure()
 plt.imshow(rho_dummy[50:200,125,50:200])
-plt.title('rho_dummy')
+plt.title('rho dummy')
+plt.colorbar()
+
+plt.figure()
+plt.imshow(rho_by_c_dummy[50:200,125,50:200])
+plt.title('rho by c dummy')
+plt.colorbar()
+
+plt.figure()
+plt.imshow(rho_by_c_dummy[50:200,125,50:200]/rho_dummy[50:200,125,50:200])
+plt.title('c dummy')
+plt.colorbar()
+
+plt.figure()
+plt.imshow(rho_1bar_3D[50:200,125,50:200])
+plt.title('rho 1bar')
+plt.colorbar()
+
+plt.figure()
+plt.imshow(rho_by_c_1bar_3D[50:200,125,50:200])
+plt.title('rho by c 1bar')
+plt.colorbar()
+
+plt.figure()
+plt.imshow(rho_by_c_1bar_3D[50:200,125,50:200]/rho_1bar_3D[50:200,125,50:200])
+plt.title('c 1bar')
 plt.colorbar()
 
 plt.figure()
 plt.title('rho_profile')
 plt.plot(rho_profile)
+
+plt.figure()
+plt.title('rho_by_c_dummy_profile')
+plt.plot(rho_by_c_profile)
+
+plt.figure()
+plt.title('rho_profile')
+plt.plot(rho_1bar_3D[50:200,100,50])
+
+plt.figure()
+plt.title('rho_by_c_profile')
+plt.plot(rho_by_c_1bar_3D[50:200,100,50])
+
 plt.show(block=False)
 
 # RESHAPE TO 1D VECTOR AND SHRINK DOMAIN TO 50 (INSTEAD OF 250)
