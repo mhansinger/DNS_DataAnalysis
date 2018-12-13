@@ -6,7 +6,7 @@
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 N_DNS = 250
 
@@ -49,41 +49,41 @@ rho_dummy[:, :, :int(N_DNS/2)].fill(float(rho_max))
 #FILL WITH THE C_PROFILE SCALED ENTRIES
 print('Fill with the c-profile entries')
 
-start_id = 105
+start_id = 125
 for i in range(profile_len):
     rho_by_c_dummy[:, :, i+start_id] = rho_by_c_profile[i]
     rho_dummy[:, :, i + start_id] = rho_profile[i]
     #c_dummy[:, :, i + start_id] = c_profile[i]
 
-new_domain = 150
+new_domain = 250
 
 # RESHAPE TO 1D VECTOR AND SHRINK DOMAIN TO 50 (INSTEAD OF 250)
-rho_by_c_dummy=rho_by_c_dummy[50:200,50:200,50:200].reshape(new_domain**3)
-rho_dummy=rho_dummy[50:200,50:200,50:200].reshape(new_domain**3)
+rho_by_c_dummy=rho_by_c_dummy.reshape(new_domain**3)
+rho_dummy=rho_dummy.reshape(new_domain**3)
 
 # WRITE TO FILE
 rho_by_c_dummy.tofile('rho_by_c.dat',sep='\n',format='%s')
 rho_dummy.tofile('rho.dat',sep='\n',format='%s')
 
 # VERYFY WITH A PLOT
-plt.close('all')
+#plt.close('all')
 
-plt.figure()
-plt.imshow(rho_dummy.reshape(new_domain,new_domain,new_domain)[:,10,:])
-plt.title('rho dummy')
-plt.colorbar()
+#plt.figure()
+#plt.imshow(rho_dummy.reshape(new_domain,new_domain,new_domain)[:,10,:])
+#plt.title('rho dummy')
+#plt.colorbar()
 
-plt.figure()
-plt.imshow(rho_by_c_dummy.reshape(new_domain,new_domain,new_domain)[:,10,:])
-plt.title('rho by c dummy')
-plt.colorbar()
+#plt.figure()
+#plt.imshow(rho_by_c_dummy.reshape(new_domain,new_domain,new_domain)[:,10,:])
+#plt.title('rho by c dummy')
+#plt.colorbar()
 
 c_dummy=rho_by_c_dummy.reshape(new_domain,new_domain,new_domain) / rho_dummy.reshape(new_domain,new_domain,new_domain)
 
-plt.figure()
-plt.imshow(c_dummy[:,10,:])#c_dummy[50:200,125,50:200])
-plt.title('c dummy')
-plt.colorbar()
+#plt.figure()
+#plt.imshow(c_dummy[:,10,:])#c_dummy[50:200,125,50:200])
+#plt.title('c dummy')
+#plt.colorbar()
 
 # plt.figure()
 # plt.imshow(rho_1bar_3D[50:200,125,50:200])
@@ -100,17 +100,17 @@ plt.colorbar()
 # plt.title('c 1bar')
 # plt.colorbar()
 
-plt.figure()
-plt.title('rho_profile')
-plt.plot(rho_profile)
+#plt.figure()
+#plt.title('rho_profile')
+#plt.plot(rho_profile)
 
-plt.figure()
-plt.title('rho_by_c_dummy_profile')
-plt.plot(rho_by_c_profile)
+#plt.figure()
+#plt.title('rho_by_c_dummy_profile')
+#plt.plot(rho_by_c_profile)
 
-plt.figure()
-plt.title('c_dummy_profile')
-plt.plot(c_dummy[10,12,:] )
+#plt.figure()
+#plt.title('c_dummy_profile')
+#plt.plot(c_dummy[10,12,:] )
 
 # plt.figure()
 # plt.title('rho_profile')
@@ -120,6 +120,6 @@ plt.plot(c_dummy[10,12,:] )
 # plt.title('rho_by_c_profile')
 # plt.plot(rho_by_c_1bar_3D[50:200,100,50])
 
-plt.show(block=False)
+#plt.show(block=False)
 
 print('\nALL DONE!')

@@ -71,7 +71,7 @@ class data_binning_PDF(object):
         elif self.case=='dummy_planar_flame':
             # this is a dummy case with 50x50x50 entries!
             print('\n################\nThis is the dummy test case!\n################\n')
-            self.Nx = 150
+            self.Nx = 250
             self.bfact = 7364.0
             self.Re = 100
             self.delta_x = 1/188
@@ -165,7 +165,7 @@ class data_binning_PDF(object):
                     # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
                     if (self.this_c_set > self.threshold).any() and (self.this_c_set < self.c_rho_max).all():
 
-                        print('If criteria erreicht!')
+                        #print('If criteria erreicht!')
                         #compute c-bar
 
                         #self.compute_cbar(i,j,k,histogram)
