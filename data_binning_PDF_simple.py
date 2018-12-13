@@ -171,7 +171,7 @@ class data_binning_PDF(object):
                         #self.compute_cbar(i,j,k,histogram)
                         c_bar = self.this_c_set.mean()
                         print(c_bar)
-                        print('i, j, k :' % (i, j ,k))
+                        print('i=%i, j=%i, k=%i :' % (i, j ,k))
 
     @jit
     def compute_cbar(self,i,j,k,histogram):
