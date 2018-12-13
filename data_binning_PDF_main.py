@@ -15,6 +15,9 @@ import dask.dataframe as dd
 import dask.array as da
 from numba import jit
 from mayavi import mlab
+# to free memory
+import gc
+
 
 
 class data_binning_PDF(object):
@@ -132,7 +135,7 @@ class data_binning_PDF(object):
     def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
         # run the analysis without computation of wrinkling factor -> planar flame (dummy case)
 
-        self.filter_width  =filter_width
+        self.filter_width =filter_width
         self.threshold = threshold
         self.interval = interval
         self.c_rho_max = c_rho_max
@@ -146,11 +149,13 @@ class data_binning_PDF(object):
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
 
                     # TEST VERSION
+                    # this is the current data cube which constitutes the LES cell
                     this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
 
                     #print(this_rho_c_set)
 
                     # check if threshold condition is reached
+                    # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
                     if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
 
                         #print('If criteria erreicht!')
@@ -179,6 +184,8 @@ class data_binning_PDF(object):
 
                     # TEST VERSION
                     this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+
+                    print(min(this_rho_c_set))
 
                     # check if threshold condition is reached
                     if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
@@ -212,7 +219,7 @@ class data_binning_PDF(object):
         this_RR_reshape_DNS = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
 
         # another criteria
-        if c_tilde < 0.99:
+        if this_c_bar < 0.99:
             # construct empty data array and fill it
             data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
             data_arr[:, 0] = c_tilde
@@ -320,8 +327,6 @@ class data_binning_PDF(object):
     def plot_histograms_intervals(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
         # plot c, RR, and integration boundaries c_plus, c_minus
 
-        c_max = 0.182363
-
         fig, (ax1) = plt.subplots(ncols=1, figsize=(10, 4))
         # ax0.hist(this_rho_c_reshape,bins=self.bins,normed=True,edgecolor='black', linewidth=0.7)
         # ax0.set_title('rho*c')
@@ -352,6 +357,8 @@ class data_binning_PDF(object):
 
             counter = counter + val
 
+        # GARBAGE COLLECT FREE MEMORY
+        gc.collect()
         #print('RR_LES_mean: ', RR_LES_mean)
 
         ###################################
