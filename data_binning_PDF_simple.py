@@ -156,10 +156,10 @@ class data_binning_PDF(object):
                                        k - self.filter_width:k].compute()
                     self.this_c_set = self.this_rho_c_set /self.this_rho_set
 
-                    try:
-                        print(self.this_c_set.min())
-                    except ValueError:
-                        pass
+                    #try:
+                    #    print(self.this_c_set.min())
+                    #except ValueError:
+                    #    pass
 
                     # check if threshold condition is reached
                     # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
