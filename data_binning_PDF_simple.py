@@ -17,6 +17,7 @@ from numba import jit
 #from mayavi import mlab
 # to free memory
 import gc
+import time
 
 
 
@@ -88,7 +89,8 @@ class data_binning_PDF(object):
         self.p_0 = 1
 
         # TO BE COMPUTED
-        self._c_bar = None
+        self.this_c_bar = None
+        self.c_tilde = None
 
         self._c_0 = None
         self.c_plus = None
@@ -132,13 +134,13 @@ class data_binning_PDF(object):
         self.rho_c_data_da = da.asarray(self.data_rho_c).reshape(self.Nx,self.Nx,self.Nx)
 
     @jit
-    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
+    def run_analysis(self,filter_width = 8, interval = 2, c_min_thresh=0.005, c_max_thresh = 1.0, histogram=True):
         # run the analysis without computation of wrinkling factor -> planar flame (dummy case)
 
         self.filter_width =filter_width
-        self.threshold = threshold
+        # self.threshold = c_min_threshold
         self.interval = interval
-        self.c_rho_max = c_rho_max
+        # self.c_rho_max = c_max_threshold
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta = self.Sc * self.Re / np.sqrt(self.p/self.p_0) * self.delta_x * self.filter_width
@@ -149,33 +151,34 @@ class data_binning_PDF(object):
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
 
                     # TEST VERSION
+                    # time1 = time.time()
+
                     # this is the current data cube which constitutes the LES cell
                     self.this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
                     # get the density for the relevant points! it is stored in a different file!
                     self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
-                                       k - self.filter_width:k].compute()
-                    self.this_c_set = self.this_rho_c_set /self.this_rho_set
+                                        k - self.filter_width:k].compute()
+                    self.this_c_set = self.this_rho_c_set / self.this_rho_set
 
-                    #try:
-                    #    print(self.this_c_set.min())
-                    #except ValueError:
-                    #    pass
+                    # c_bar is computed
+                    self.this_c_bar = self.this_c_set.mean()  # this_c_reshape.mean()
 
-                    # check if threshold condition is reached
-                    # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
-                    if (self.this_c_set > self.threshold).any() and (self.this_c_set < self.c_rho_max).all():
+                    # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
+                    # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
+                    if c_min_thresh < self.this_c_bar <= c_max_thresh:
 
-                        #print('If criteria erreicht!')
-                        #compute c-bar
+                        self.compute_cbar(i,j,k,histogram)
+                        # c_bar = self.this_c_set.mean()
 
-                        #self.compute_cbar(i,j,k,histogram)
-                        c_bar = self.this_c_set.mean()
-                        print(c_bar)
-                        print('i=%i, j=%i, k=%i :' % (i, j ,k))
 
     @jit
     def compute_cbar(self,i,j,k,histogram):
         #compute c_bar without wrinkling factor
+
+        # get the density for the relevant points! it is stored in a different file!
+        # self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+        #                     k - self.filter_width:k].compute()
+        # self.this_c_set = self.this_rho_c_set / self.this_rho_set
 
         this_rho_c_reshape = self.this_rho_c_set.reshape(self.filter_width**3)
         this_rho_reshape = self.this_rho_set.reshape(self.filter_width**3)
@@ -187,49 +190,47 @@ class data_binning_PDF(object):
         # c without density
         this_c_reshape = self.this_c_set.reshape(self.filter_width**3) #this_rho_c_reshape / this_rho_reshape
 
-        # c_bar is computed
-        this_c_bar = this_c_reshape.mean()
-
         # compute c_tilde: mean(rho*c)/mean(rho)
-        c_tilde = this_rho_c_mean / this_rho_mean
+        self.this_c_tilde = this_rho_c_mean / this_rho_mean
 
         # compute the reaction rate of each cell     Eq (2.28) Senga documentation
         # note that for Le=1: c=T, so this_c_reshape = this_T_reshape
         exponent = - self.beta*(1-this_c_reshape) / (1 - self.alpha*(1 - this_c_reshape))
         this_RR_reshape_DNS = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
 
-        # another criteria
-        if this_c_bar < 0.99:
-            # construct empty data array and fill it
-            data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
-            data_arr[:, 0] = c_tilde
-            data_arr[:, 1] = this_rho_mean
-            data_arr[:, 2] = this_rho_c_reshape
-            data_arr[:, 3] = this_rho_reshape
-            data_arr[:, 4] = this_RR_reshape_DNS
-            #data_arr[:, 5] = int(i)
-            #data_arr[:, 6] = int(j)
-            #data_arr[:, 7] = int(k)
-            #
-            data_df = pd.DataFrame(data_arr, columns=self.col_names)
-            file_name = 'c_tilde_%.5f_filter_%i_%s.csv' % (c_tilde, self.filter_width, self.case)
+        # construct empty data array and fill it
+        data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
+        data_arr[:, 0] = self.this_c_tilde
+        data_arr[:, 1] = this_rho_mean
+        data_arr[:, 2] = this_rho_c_reshape
+        data_arr[:, 3] = this_rho_reshape
+        data_arr[:, 4] = this_RR_reshape_DNS
+        # data_arr[:, 5] = int(i)
+        # data_arr[:, 6] = int(j)
+        # data_arr[:, 7] = int(k)
+        #
+        data_df = pd.DataFrame(data_arr, columns=self.col_names)
+        file_name = 'c_tilde_%.5f_filter_%i_%s.csv' % (self.this_c_tilde, self.filter_width, self.case)
 
-            #############################################
-            # computation of the integration boundaries
-            self.compute_c_minus(this_c_bar)
-            self.compute_c_plus(this_c_bar)
-            print('c_plus: ',self.c_plus)
-            #############################################
+        #############################################
+        # computation of the integration boundaries
+        self.compute_c_minus()
+        self.compute_c_plus()
+        print('c_plus: ', self.c_plus)
+        print('c_minus: ', self.c_minus)
+        print('c_bar: %.4f\n' % self.this_c_bar)
+        #############################################
 
-            if self.write_csv:
-                data_df.to_csv(join(self.output_path, file_name), index=False)
+        if self.write_csv:
+            data_df.to_csv(join(self.output_path, file_name), index=False)
 
-            if histogram:
-                self.plot_histograms_intervals(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,
-                                               this_rho_reshape=this_rho_reshape,c_bar=this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
+        # if histogram:
+        #     self.plot_histograms_intervals(this_rho_c_reshape=this_rho_c_reshape,
+        #                                    this_rho_reshape=this_rho_reshape,this_RR_reshape_DNS=this_RR_reshape_DNS)
 
 
-    def plot_histograms_intervals(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
+
+    def plot_histograms_intervals(self,this_rho_c_reshape,this_rho_reshape,this_RR_reshape_DNS,wrinkling=1):
         # plot c, RR, and integration boundaries c_plus, c_minus
 
         #fig, (ax1) = plt.subplots(ncols=1, figsize=(10, 4))
@@ -282,9 +283,6 @@ class data_binning_PDF(object):
         #fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (c_bar, wrinkling,self.filter_width, self.case))
         #plt.savefig(fig_name)
 
-        print('c_bar: ', c_bar)
-        print(' ')
-
 
 
     # compute self.delta_x_0
@@ -296,7 +294,7 @@ class data_binning_PDF(object):
         '''
         return (1 - c ** self.m) / (1-c)
 
-    def compute_c_0(self,c_bar):
+    def compute_c_0(self,c):
         '''
         :param c: c_bar.
         :param self.Delta: this is the scaled filter width. -> is ocmputed before
@@ -304,26 +302,25 @@ class data_binning_PDF(object):
         :return: c_0
         '''
 
-        self._c_0=(1-c_bar)*np.exp(-self.Delta/7) + (1 - np.exp(-self.Delta/7))*(1-np.exp(-2*(1-c_bar)*self.m))
+        self._c_0=(1-c)*np.exp(-self.Delta/7) + (1 - np.exp(-self.Delta/7))*(1-np.exp(-2*(1-c)*self.m))
 
-    def compute_c_minus(self,c_bar):
+    def compute_c_minus(self):
         '''
-        :param c_bar:
         :return: self.c_minus
         '''
         # update c_0 and delta_0
-        self.compute_c_0(c_bar = c_bar)
+        self.compute_c_0(c = self.this_c_bar)
         this_delta_0 = self.get_delta_0(c=(1-self._c_0))
 
-        self.c_minus = (np.exp(c_bar * this_delta_0 * (1-c_bar) * self.Delta)-1) / \
+        self.c_minus = (np.exp(self.this_c_bar * this_delta_0 * (1-self.this_c_bar) * self.Delta)-1) / \
                        (np.exp(this_delta_0 * (1-self._c_0)*self.Delta) -1)
 
-    def compute_c_plus(self,c_bar):
+    def compute_c_plus(self):
         '''
         :return: self.c_plus
         '''
         # update c_minus
-        self.compute_c_minus(c_bar)
+        self.compute_c_minus()
 
         self.c_plus = (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta)-1))
 
