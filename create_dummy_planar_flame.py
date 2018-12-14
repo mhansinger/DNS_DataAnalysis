@@ -6,7 +6,7 @@
 
 import numpy as np
 import pandas as pd
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 N_DNS = 250
 
@@ -68,15 +68,15 @@ rho_dummy.tofile('rho.dat',sep='\n',format='%s')
 # VERYFY WITH A PLOT
 #plt.close('all')
 
-#plt.figure()
-#plt.imshow(rho_dummy.reshape(new_domain,new_domain,new_domain)[:,10,:])
-#plt.title('rho dummy')
-#plt.colorbar()
+plt.figure()
+plt.imshow(rho_dummy.reshape(new_domain,new_domain,new_domain)[:,10,:])
+plt.title('rho dummy')
+plt.colorbar()
 
-#plt.figure()
-#plt.imshow(rho_by_c_dummy.reshape(new_domain,new_domain,new_domain)[:,10,:])
-#plt.title('rho by c dummy')
-#plt.colorbar()
+plt.figure()
+plt.imshow(rho_by_c_dummy.reshape(new_domain,new_domain,new_domain)[:,10,:])
+plt.title('rho by c dummy')
+plt.colorbar()
 
 c_dummy=rho_by_c_dummy.reshape(new_domain,new_domain,new_domain) / rho_dummy.reshape(new_domain,new_domain,new_domain)
 
@@ -100,13 +100,13 @@ c_dummy=rho_by_c_dummy.reshape(new_domain,new_domain,new_domain) / rho_dummy.res
 # plt.title('c 1bar')
 # plt.colorbar()
 
-#plt.figure()
-#plt.title('rho_profile')
-#plt.plot(rho_profile)
+plt.figure()
+plt.title('rho_profile')
+plt.plot(rho_profile)
 
-#plt.figure()
-#plt.title('rho_by_c_dummy_profile')
-#plt.plot(rho_by_c_profile)
+plt.figure()
+plt.title('rho_by_c_dummy_profile')
+plt.plot(rho_by_c_profile)
 
 #plt.figure()
 #plt.title('c_dummy_profile')
