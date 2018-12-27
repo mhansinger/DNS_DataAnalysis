@@ -20,7 +20,6 @@ import gc
 import time
 
 
-
 class data_binning_PDF(object):
 
     def __init__(self, case, m, alpha, beta, bins):
@@ -73,10 +72,10 @@ class data_binning_PDF(object):
             # this is a dummy case with 50x50x50 entries!
             print('\n################\nThis is the dummy test case!\n################\n')
             self.Nx = 250
-            self.bfact = 7364.0
-            self.Re = 100
-            self.delta_x = 1/188
-            self.p = 1
+            self.bfact = 7128.3 #7364.0
+            self.Re = 1000
+            self.delta_x = 1/611
+            self.p = 10
         else:
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
 
@@ -92,6 +91,7 @@ class data_binning_PDF(object):
         self.this_c_bar = None
         self.c_tilde = None
         self.c_bar_old = 0
+        self.f = None
 
         self.c_0 = None
         self.c_plus = None
@@ -146,6 +146,7 @@ class data_binning_PDF(object):
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta = (self.Sc * self.Re) / np.sqrt(self.p/self.p_0) * self.delta_x * self.filter_width
 
+        # LOOP OVER THE 3 DIMENSIONS
         count = 0
         for k in range(self.filter_width-1,self.Nx,self.interval):
             for j in range(self.filter_width - 1, self.Nx, self.interval):
@@ -230,9 +231,16 @@ class data_binning_PDF(object):
         # this is to compute the analytical PDF based on c_plus and c_minus
 
         # compute appropriate vector with c values between c_minus and c_plus:
-        self.this_c_vector = np.linspace(self.c_minus,self.c_plus,100)
+        points = 500
+        self.this_c_vector = np.linspace(self.c_minus,self.c_plus,points)
 
-        self.analytical_c_pdf = 1 / (self.Delta * self.this_c_vector *(1 - self.this_c_vector ** self.m))
+        self.analytical_c_pdf = (1 / (self.Delta * self.this_c_vector *(1 - self.this_c_vector ** self.m))) \
+                                * (self.Re * self.Sc * self.p_0/self.p)
+        # Rückrechnung von omega_xi nach omega_x
+
+        # check the INT(self.analytical_c_pdf) dc = 1
+        Integral = np.trapz(self.analytical_c_pdf,dx= points)
+        print('Integral %.3f\n' % Integral)
 
 
     def compute_analytical_RR(self):
@@ -295,14 +303,14 @@ class data_binning_PDF(object):
         ax2.set_ylim(0,90)
 
         # include analytical pdf
-        ax1.plot(self.this_c_vector , self.analytical_c_pdf, color = 'k',linewidth=1)
+        ax1.plot(self.this_c_vector[1:-1] , self.analytical_c_pdf[1:-1], color = 'k',linewidth=1)
 
         # add legend
         ax1.legend(['c pdf', 'c histogram' ])
 
         fig.tight_layout()
 
-        text_str = 'c_bar = %.3f\nc_plus = %.4f\nc_minus = %.4f\nfilter = %i\nDelta_LES = %.1f\nm = %.1f\nRR_mean_DNS = %.1f\nRR_mean_PDF = %.1f' \
+        text_str = 'c_bar = %.5f\nc_plus = %.5f\nc_minus = %.5f\nfilter = %i\nDelta_LES = %.1f\nm = %.1f\nRR_mean_DNS = %.1f\nRR_mean_PDF = %.1f' \
                    % (self.this_c_bar ,self.c_plus,self.c_minus,self.filter_width,self.Delta,self.m,this_RR_reshape_DNS.mean(),self.RR_analytical)
 
         ax0.text(0.1, 0.5, text_str, size=15)
@@ -313,8 +321,8 @@ class data_binning_PDF(object):
 
         fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (self.this_c_bar, wrinkling,self.filter_width, self.case))
         plt.savefig(fig_name)
+        plt.close('all')
         #plt.show(block=False)
-
 
     # compute self.delta_x_0
     def get_delta_0(self,c):
@@ -325,6 +333,7 @@ class data_binning_PDF(object):
         '''
         return (1 - c ** self.m) / (1-c)
 
+
     def compute_c_0(self):
         '''
         :param c: c_bar.
@@ -333,7 +342,8 @@ class data_binning_PDF(object):
         :return: c_0
         '''
 
-        #print('c_bar in: ', self.this_c_bar)
+        self.compute_f()        # update the f value
+
         c = self.this_c_bar
         Delta = self.Delta
         m = self.m
@@ -341,9 +351,9 @@ class data_binning_PDF(object):
         #c_0 =((1 - c) * np.exp( - Delta / 7) + (1 - np.exp( - Delta / 7)) * (1 - np.exp(-2 * (1-c) * m)))
 
         #print('Other c_0: ', c_0)
-        self.c_0=(1 - self.this_c_bar)*np.exp( - self.Delta / 7) + \
-                 (1 - np.exp( - self.Delta / 7)) * \
-                 (1 - np.exp( - 2 * (1 - self.this_c_bar) * self.m))
+        self.c_0=(1 - self.this_c_bar)*self.f + \
+                 (1 - self.f) * \
+                 (1 - np.exp(- 2 * (1 - self.this_c_bar) * self.m))
 
 
     def compute_c_minus(self):
@@ -354,8 +364,8 @@ class data_binning_PDF(object):
         self.compute_c_0()
         this_delta_0 = self.get_delta_0(c=(1-self.c_0))
 
-        self.c_minus = (np.exp(self.this_c_bar * this_delta_0  * self.Delta)-1) / \
-                       (np.exp(this_delta_0 * self.Delta) -1)
+        self.c_minus = (np.exp(self.this_c_bar * this_delta_0 * self.Delta)-1) / \
+                       (np.exp(this_delta_0 * self.Delta) - 1)
 
 
     def compute_c_plus(self):
@@ -365,7 +375,20 @@ class data_binning_PDF(object):
         # update c_minus
         self.compute_c_minus()
 
-        self.c_plus = (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta)-1))
+        self.c_plus = (1 + (-1 + self.c_minus ** (-self.m)) * np.exp(-self.Delta * self.m)) ** (-1/self.m)
+        # (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta) - 1))
+
+
+    def compute_f(self):
+        '''
+        :return: f value, APF. 28
+        '''
+        a = 8.25
+        b = 0.75
+        g = 1/3
+        d = e = 4
+
+        self.f = np.exp(- self.Delta / a) - b * self.this_c_bar ** 2 * np.exp(-g * self.m) * np.exp(-((self.Delta - d)/ e) ** 2)
 
 
 
