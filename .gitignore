@@ -3,5 +3,5 @@
 *.csv
 
 *.dat
-
+__pycache__
 
