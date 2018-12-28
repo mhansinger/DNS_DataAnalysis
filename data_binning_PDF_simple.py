@@ -96,9 +96,14 @@ class data_binning_PDF(object):
         self.c_0 = None
         self.c_plus = None
         self.c_minus = None
+        self.pc_by_dc = None
+        self.analytical_hist = None
 
         # SCHMIDT NUMBER
         self.Sc = 0.7
+
+        # OFFSET EPS TO AVOID SINGULARITY AT C_PLUS AND C_MINUS FOR CALCULATION OF p(c)
+        self.eps = 0.000025
 
         # DELTA: NORMALIZED FILTERWIDTH
         self.Delta = None # --> is computed in self.run_analysis !
@@ -231,16 +236,39 @@ class data_binning_PDF(object):
         # this is to compute the analytical PDF based on c_plus and c_minus
 
         # compute appropriate vector with c values between c_minus and c_plus:
-        points = 500
+        points = self.filter_width**3 / 10
+
         self.this_c_vector = np.linspace(self.c_minus,self.c_plus,points)
 
-        self.analytical_c_pdf = (1 / (self.Delta * self.this_c_vector *(1 - self.this_c_vector ** self.m))) \
-                                * (self.Re * self.Sc * self.p_0/self.p)
-        # Rückrechnung von omega_xi nach omega_x
+        self.analytical_c_pdf = ( 1 / (self.Delta * self.this_c_vector * (1 - self.this_c_vector ** self.m + self.eps))) \
+                                  * (self.Re * self.Sc * self.p_0/self.p)
+
+        # get the gradient of c_vector (equidistant in this case)
+        dc = self.this_c_vector[1]-self.this_c_vector[0]
+
+        self.pc_by_dc = self.analytical_c_pdf * dc
+        self.pc_by_dc_2 = self.analytical_c_pdf[1:-1] * dc
 
         # check the INT(self.analytical_c_pdf) dc = 1
-        Integral = np.trapz(self.analytical_c_pdf,dx= points)
-        print('Integral %.3f\n' % Integral)
+        self.Integral = np.trapz(self.pc_by_dc,dx= 1/points)#self.pc_by_dc.sum() #np.trapz(self.analytical_c_pdf,dx= 1/points)
+        print('Integral %.3f' % self.Integral)
+        print('Integral %.3f\n' % self.pc_by_dc_2.sum())
+
+        factor = self.bins * 100
+        self.analytical_hist = np.zeros(factor)
+
+        # DEFINE THE CHUNK SIZE
+        chunk_size = int(points/factor)
+
+        #loop over the data:
+        for i,_ in enumerate(self.analytical_hist):
+            if i==0:
+                self.analytical_hist[i] = self.analytical_c_pdf[i+1:i+chunk_size-1].sum()
+            else:
+                self.analytical_hist[i] = self.analytical_c_pdf[1:i + chunk_size].sum()
+
+        normalizer = self.analytical_hist.sum()
+        self.analytical_hist = self.analytical_hist/normalizer
 
 
     def compute_analytical_RR(self):
@@ -295,23 +323,28 @@ class data_binning_PDF(object):
         ax1.set_title('c histogram / pdf')
         ax1.set_xlim(0,1)
 
-        ax2 = ax1.twinx()
+        #ax2 = ax1.twinx()
         color = 'r'
-        ax2.set_ylabel('Reaction Rate', color=color)
-        ax1.hist(this_c_reshape, bins=self.bins, normed=True, edgecolor='black', linewidth=0.7)
-        ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=1.5)
-        ax2.set_ylim(0,90)
+        #ax2.set_ylabel('Reaction Rate', color=color)
+
+        ax1.hist(this_c_reshape, bins=self.bins, density=1, edgecolor='black', linewidth=0.7)
+        #ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=1.5)
+        #ax2.set_ylim(0,90)
 
         # include analytical pdf
-        ax1.plot(self.this_c_vector[1:-1] , self.analytical_c_pdf[1:-1], color = 'k',linewidth=1)
+        ax1.plot(self.this_c_vector, self.pc_by_dc, color = 'r', linewidth=2)
+
+        # binning of analytical pdf
+        # ax1.hist(self.analytical_hist, bins=self.bins, density=1, color='red', alpha=0.5,edgecolor='black', linewidth=0.7)
+
 
         # add legend
-        ax1.legend(['c pdf', 'c histogram' ])
+        ax1.legend(['c pdf', 'c histogram'])
 
         fig.tight_layout()
 
-        text_str = 'c_bar = %.5f\nc_plus = %.5f\nc_minus = %.5f\nfilter = %i\nDelta_LES = %.1f\nm = %.1f\nRR_mean_DNS = %.1f\nRR_mean_PDF = %.1f' \
-                   % (self.this_c_bar ,self.c_plus,self.c_minus,self.filter_width,self.Delta,self.m,this_RR_reshape_DNS.mean(),self.RR_analytical)
+        text_str = 'c_bar = %.5f\nc_plus = %.5f\nc_minus = %.5f\nfilter = %i\nDelta_LES = %.1f\nm = %.1f\nRR_mean_DNS = %.1f\nRR_mean_PDF = %.1f\nInt. p(c)dc = %.0f' \
+                   % (self.this_c_bar ,self.c_plus,self.c_minus,self.filter_width,self.Delta,self.m,this_RR_reshape_DNS.mean(),self.RR_analytical,self.pc_by_dc_2.sum())
 
         ax0.text(0.1, 0.5, text_str, size=15)
         ax0.axis('off')
@@ -348,9 +381,6 @@ class data_binning_PDF(object):
         Delta = self.Delta
         m = self.m
 
-        #c_0 =((1 - c) * np.exp( - Delta / 7) + (1 - np.exp( - Delta / 7)) * (1 - np.exp(-2 * (1-c) * m)))
-
-        #print('Other c_0: ', c_0)
         self.c_0=(1 - self.this_c_bar)*self.f + \
                  (1 - self.f) * \
                  (1 - np.exp(- 2 * (1 - self.this_c_bar) * self.m))
@@ -376,7 +406,6 @@ class data_binning_PDF(object):
         self.compute_c_minus()
 
         self.c_plus = (1 + (-1 + self.c_minus ** (-self.m)) * np.exp(-self.Delta * self.m)) ** (-1/self.m)
-        # (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta) - 1))
 
 
     def compute_f(self):
@@ -390,20 +419,6 @@ class data_binning_PDF(object):
 
         self.f = np.exp(- self.Delta / a) - b * self.this_c_bar ** 2 * np.exp(-g * self.m) * np.exp(-((self.Delta - d)/ e) ** 2)
 
-
-
-# if __name__ == "__main__":
-#
-#     print('Starting 1bar case!')
-#     filter_widths=[16,32]
-#
-#     for f in filter_widths:
-#         # RENEW!!!
-#         bar1 = data_binning_PDF(case='1bar',m=4.8,  alpha=0.81818, beta=6, bins=20)
-#         bar1.dask_read_transform()
-#         print('\nRunning with filter width: %i' % f)
-#         bar1.run_analysis_wrinkling(filter_width=f, interval=8, histogram=True)
-#         del bar1
 
 
 

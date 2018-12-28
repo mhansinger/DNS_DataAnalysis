@@ -4,13 +4,14 @@ from data_binning_PDF_simple import data_binning_PDF
 # to free memory
 import gc
 import matplotlib.pyplot as plt
+import numpy as np
 
 print('Starting dummy case!')
-filter_widths = [8,16,32]
+filter_widths = [10]
 
 for f in filter_widths:
 
-    bar_dummy = data_binning_PDF(case='dummy_planar_flame', m=4.5, alpha=0.81818 , beta=6, bins=20)
+    bar_dummy = data_binning_PDF(case='dummy_planar_flame', m=4.5, alpha=0.81818 , beta=6, bins=50)
     bar_dummy.dask_read_transform()
     print('\nRunning with filter width: %i' % f)
 
