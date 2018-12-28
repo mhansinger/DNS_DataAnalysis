@@ -1,7 +1,8 @@
 # gitignore file
 
 *.csv
+*.pdf
 
 *.dat
-
+__pycache__
 
