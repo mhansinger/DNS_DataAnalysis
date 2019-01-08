@@ -1,9 +1,9 @@
 '''
-This is to read in the binary data File for the high pressure bunsen data
+This is to read in the binary data File for the high pressure bunsen data and perform post processing
 
 @author: mhansinger
 
-last change: 13.12.2018
+last change: 8.1.2019
 '''
 
 import numpy as np
@@ -124,6 +124,7 @@ class data_binning_PDF(object):
         ########################
 
     def dask_read_transform(self):
+        ''' Dask reader '''
 
         try:
             self.data_rho_c = dd.read_csv(self.c_path,names=['rho_c'])
@@ -236,7 +237,7 @@ class data_binning_PDF(object):
         # this is to compute the analytical PDF based on c_plus and c_minus
 
         # compute appropriate vector with c values between c_minus and c_plus:
-        points = self.filter_width**3 / 10
+        points = 200#self.filter_width**3 / 10
 
         self.this_c_vector = np.linspace(self.c_minus,self.c_plus,points)
 
@@ -247,7 +248,7 @@ class data_binning_PDF(object):
         dc = self.this_c_vector[1]-self.this_c_vector[0]
 
         self.pc_by_dc = self.analytical_c_pdf * dc
-        self.pc_by_dc_2 = self.analytical_c_pdf[1:-1] * dc
+        self.pc_by_dc_2 = self.analytical_c_pdf[1:-1] #* dc
 
         # check the INT(self.analytical_c_pdf) dc = 1
         self.Integral = np.trapz(self.pc_by_dc,dx= 1/points)#self.pc_by_dc.sum() #np.trapz(self.analytical_c_pdf,dx= 1/points)
@@ -273,7 +274,7 @@ class data_binning_PDF(object):
 
     def compute_analytical_RR(self):
         # computes the analytical RR (omega_bar) based on the interval boundaries c_minus and c_plus
-        self.RR_analytical = 1/self.Delta * (self.c_plus ** (self.m + 1) - self.c_minus ** (self.m + 1))
+        self.RR_analytical = (((self.c_plus - self.c_minus) ** (self.m + 1)) / self.Delta) * (self.Re * self.Sc * self.p_0 / self.p)
 
 
     def plot_histograms_intervals(self,this_rho_c_reshape,this_rho_reshape,this_RR_reshape_DNS,wrinkling=1):

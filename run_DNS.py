@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 print('Starting dummy case!')
-filter_widths = [10]
+filter_widths = [32]
 
 for f in filter_widths:
 
