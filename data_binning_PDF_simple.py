@@ -248,7 +248,7 @@ class data_binning_PDF(object):
         dc = self.this_c_vector[1]-self.this_c_vector[0]
 
         self.pc_by_dc = self.analytical_c_pdf * dc
-        self.pc_by_dc_2 = self.analytical_c_pdf[1:-1] #* dc
+        self.pc_by_dc_2 = self.analytical_c_pdf[1:-1] * dc
 
         # check the INT(self.analytical_c_pdf) dc = 1
         self.Integral = np.trapz(self.pc_by_dc,dx= 1/points)#self.pc_by_dc.sum() #np.trapz(self.analytical_c_pdf,dx= 1/points)
