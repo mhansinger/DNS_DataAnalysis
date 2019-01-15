@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 print('Starting dummy case!')
-filter_widths = [32]
+filter_widths = [24]
 
 for f in filter_widths:
 
@@ -16,7 +16,8 @@ for f in filter_widths:
     print('\nRunning with filter width: %i' % f)
 
     try:
-        bar_dummy.run_analysis(filter_width=f, interval=5, c_min_thresh=0.00057, c_max_thresh=1, histogram=True)
+        bar_dummy.run_analysis(filter_width=f, interval=2, c_min_thresh=0.00057, c_max_thresh=1, histogram=True)
+        gc.collect()
     except KeyboardInterrupt:
         gc.collect()
         print('\nCANCELED BY USER!')

@@ -71,7 +71,7 @@ class data_binning(object):
         self.c_data_da = da.asarray(self.data_c).reshape(self.Nx,self.Nx,self.Nx)
 
     @jit
-    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.05, c_rho_max = 0.1818,histogram=True ):
+    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.099, c_rho_max = 0.1818,histogram=True ):
         self.filter_width  =filter_width
         self.threshold = threshold
         self.interval = interval
@@ -86,13 +86,13 @@ class data_binning(object):
                     this_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
 
                     # check if threshold condition is reached
-                    if (this_set > self.threshold).any() and (this_set < self.c_rho_max).all():
+                    if (this_set.mean() > self.threshold) and (this_set < self.c_rho_max).all():
 
                         #compute c-bar
                         self.compute_cbar(this_set,i,j,k,histogram)
 
     @jit
-    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.05, c_rho_max = 0.1818,histogram=True, write_csv=False):
+    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.05, c_rho_max = 0.183,histogram=True, write_csv=False):
         self.write_csv = write_csv
         self.filter_width  =filter_width
         self.threshold = threshold
@@ -216,7 +216,7 @@ class data_binning(object):
         #fig.tight_layout()
         plt.suptitle('c_tilde = %.3f; c_bar = %.3f; wrinkling = %.3f; RR_mean_DNS = %.2f; RR_mean_LES = %.2f\n' %
                      (c_tilde,c_bar,wrinkling,this_RR_reshape_DNS.mean(),RR_LES_mean) )
-        fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (c_bar, wrinkling,self.filter_width, self.case))
+        fig_name = join(self.case,'output_test','c_bar_%.4f_wrinkl_%.3f_filter_%i.png' % (c_bar, wrinkling,self.filter_width))
         plt.savefig(fig_name)
 
         print('c_tilde: ', c_tilde)
@@ -425,7 +425,7 @@ class data_binning(object):
             # print("A_LES: ", this_magGrad)
             return this_magGrad_c
 
-'''
+
     # added Nov. 2018: Implementation of Pfitzner's analytical boundaries
     # getter and setter for c_Mean as a protected
     def set_c_bar(self,c_bar):
@@ -473,21 +473,21 @@ class data_binning(object):
         self.compute_c_minus(c_bar)
 
         self.c_plus = (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta)-1))
-'''
 
 
 
-if __name__ == "__main__":
 
-    print('Starting 1bar case!')
-    filter_widths=[16,32]
-
-    for f in filter_widths:
-        bar1 = data_binning(case='1bar', Nx=250, alpha=0.81818, beta=6, befact=7361)
-        bar1.dask_read_transform()
-        print('\nRunning with filter width: %i' % f)
-        bar1.run_analysis_wrinkling(filter_width=f, interval=8, histogram=True)
-        del bar1
+# if __name__ == "__main__":
+#
+#     print('Starting 1bar case!')
+#     filter_widths=[16,32]
+#
+#     for f in filter_widths:
+#         bar1 = data_binning(case='1bar', Nx=250, alpha=0.81818, beta=6, befact=7361)
+#         bar1.dask_read_transform()
+#         print('\nRunning with filter width: %i' % f)
+#         bar1.run_analysis_wrinkling(filter_width=f, interval=8, histogram=True)
+#         del bar1
 
 
 

@@ -199,6 +199,8 @@ class data_binning_PDF(object):
         exponent = - self.beta*(1-this_c_reshape) / (1 - self.alpha*(1 - this_c_reshape))
         this_RR_reshape_DNS = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
 
+        this_RR_reshape_DNS[this_RR_reshape_DNS<0] = 0
+
         # construct empty data array and fill it
         data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
         data_arr[:, 0] = self.this_c_tilde
@@ -248,7 +250,7 @@ class data_binning_PDF(object):
         dc = self.this_c_vector[1]-self.this_c_vector[0]
 
         self.pc_by_dc = self.analytical_c_pdf * dc
-        self.pc_by_dc_2 = self.analytical_c_pdf[1:-1] * dc
+        self.pc_by_dc_2 = self.analytical_c_pdf[2:-2] * dc
 
         # check the INT(self.analytical_c_pdf) dc = 1
         self.Integral = np.trapz(self.pc_by_dc,dx= 1/points)#self.pc_by_dc.sum() #np.trapz(self.analytical_c_pdf,dx= 1/points)
@@ -312,9 +314,9 @@ class data_binning_PDF(object):
         for id, val in enumerate(hist):
             RR_interval = sorted_RR_reshape_DNS[counter:counter+val].mean()
             RR_LES_mean = RR_LES_mean + (RR_interval*probability_c[id])
-            counter = counter + val
+            counter =+ val
 
-        # GARBAGE COLLECT FREE MEMORY
+        # GARBAGE COLLECT AND FREE MEMORY
         gc.collect()
         #print('RR_LES_mean: ', RR_LES_mean)
 
@@ -324,13 +326,14 @@ class data_binning_PDF(object):
         ax1.set_title('c histogram / pdf')
         ax1.set_xlim(0,1)
 
-        #ax2 = ax1.twinx()
-        color = 'r'
-        #ax2.set_ylabel('Reaction Rate', color=color)
+        ax2 = ax1.twinx()
+        color = 'g'
+        ax2.set_ylabel('Reaction Rate', color=color)
 
         ax1.hist(this_c_reshape, bins=self.bins, density=1, edgecolor='black', linewidth=0.7)
-        #ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=1.5)
-        #ax2.set_ylim(0,90)
+        ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color='k', s=2.8)
+        ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=2.5)
+        ax2.set_ylim(0,90)
 
         # include analytical pdf
         ax1.plot(self.this_c_vector, self.pc_by_dc, color = 'r', linewidth=2)
