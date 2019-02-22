@@ -166,7 +166,9 @@ class data_binning(object):
 
     def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
         # plot the c_tilde and c, both normalized
+        print('not implemented')
 
+        '''
         c_max = 0.182363
 
         fig, (ax0, ax1) = plt.subplots(ncols=2, figsize=(10, 4))
@@ -235,6 +237,7 @@ class data_binning(object):
         # plt.subplot(221)
         # plt.hist(this_rho_c_reshape/this_rho_reshape,bins=self.bins,normed=True)
         # plt.title('c')
+        '''
 
     @jit
     def compute_cbar_wrinkling(self,data_set,i,j,k,histogram):
@@ -297,6 +300,7 @@ class data_binning(object):
                 # print('c_tilde: ', c_tilde)
 
                 # plot the surface in the box if wrinkling > 10
+                '''
                 if this_wrinkling > 10:
                     file_name_3D_plot = 'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s_ISO_surface.png' % (
                     this_c_bar, this_wrinkling, self.filter_width, self.case)
@@ -305,7 +309,7 @@ class data_binning(object):
 
                     mlab.contour3d(c_3D)
                     mlab.savefig(join(self.output_path,file_name_3D_plot))
-                    mlab.close()
+                    mlab.close()'''
 
             else:
                 print("##################")
