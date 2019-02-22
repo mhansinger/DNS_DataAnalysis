@@ -3,18 +3,18 @@ This is to read in the binary data File for the high pressure bunsen data
 
 @author: mhansinger
 
-last change: 6.12.2018
+last change: 22.2.2019
 '''
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import os
 from os.path import join
 import dask.dataframe as dd
 import dask.array as da
 from numba import jit
-from mayavi import mlab
+#from mayavi import mlab
 
 
 class data_binning(object):
@@ -30,7 +30,7 @@ class data_binning(object):
         self.write_csv = False
 
         # for reaction rates
-        self.alpha =alpha
+        self.alpha = alpha
         self.beta = beta
         self.bfact = befact
         self._c_bar = None
@@ -46,6 +46,8 @@ class data_binning(object):
         print("Sc = %f" % Sc)
         #print()
         self.Delta = None
+
+        self.file_name_list = []
 
         # checks if output directory exists
         self.output_path = join(case,'output_test')
@@ -92,7 +94,7 @@ class data_binning(object):
                         self.compute_cbar(this_set,i,j,k,histogram)
 
     @jit
-    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.05, c_rho_max = 0.183,histogram=True, write_csv=False):
+    def run_analysis_wrinkling(self, filter_width = 8, interval = 2, threshold=0.05, c_rho_max = 0.183, histogram=False, write_csv=False):
         self.write_csv = write_csv
         self.filter_width  =filter_width
         self.threshold = threshold
@@ -150,6 +152,8 @@ class data_binning(object):
             #
             data_df = pd.DataFrame(data_arr, columns=self.col_names)
             file_name = 'c_tilde_%.5f_filter_%i_%s.csv' % (c_tilde, self.filter_width, self.case)
+
+            self.file_name_list.append(file_name)
 
             if self.write_csv:
                 data_df.to_csv(join(self.output_path, file_name), index=False)
@@ -425,54 +429,15 @@ class data_binning(object):
             # print("A_LES: ", this_magGrad)
             return this_magGrad_c
 
+    def write_file_list(self):
+        # write only the file names with c_bar, and so on..
+        with open(join(self.case,'filename.txt'), 'w') as f:
+            for item in self.file_name_list:
+                f.write("%s\n" % item)
 
-    # added Nov. 2018: Implementation of Pfitzner's analytical boundaries
-    # getter and setter for c_Mean as a protected
-    def set_c_bar(self,c_bar):
-        self._c_bar = c_bar
+            f.close()
 
-    def get_c_bar(self):
-        return self._c_bar
 
-    # compute delta_0
-    def get_delta_0(self,c):
-        '''
-        :param c: usually c_0
-        :param m: steepness of the flame front; not sure how computed
-        :return: computes delta_0, needed for c_plus and c_minus
-        '''
-        return (1 - c ** self.m) / (1-c)
-
-    def compute_c_0(self,c_bar):
-        '''
-        :param c: c_bar.
-        :param Delta: this is the scaled filter width. has to be computed!!
-        :param m: steepness of the flame front; not sure how computed
-        :return: c_0
-        '''
-        # WAS IST Z???
-        self._c_0=(1-c_bar)*np.exp(-self.Delta/z) + (1 - np.exp(-self.Delta/z))*(1-np.exp(-2*(1-c_bar)*self.m))
-
-    def compute_c_minus(self,c_bar):
-        '''
-        :param c_bar:
-        :return: self.c_minus
-        '''
-        # update c_0 and delta_0
-        self.compute_c_0(c_bar=c_bar)
-        this_delta_0 = self.get_delta_0(c=(1-self._c_0))
-
-        self.c_minus = (np.exp(c_bar * this_delta_0 * (1-c_bar) * self.Delta)-1) / \
-                       (np.exp(this_delta_0 * (1-self._c_0)*self.Delta) -1)
-
-    def compute_c_plus(self,c_bar):
-        '''
-        :return: self.c_plus
-        '''
-        # update c_minus
-        self.compute_c_minus(c_bar)
-
-        self.c_plus = (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta)-1))
 
 
 
