@@ -276,7 +276,7 @@ class data_binning_PDF(object):
 
     def compute_analytical_RR(self):
         # computes the analytical RR (omega_bar) based on the interval boundaries c_minus and c_plus
-        self.RR_analytical = (((self.c_plus - self.c_minus) ** (self.m + 1)) / self.Delta) * (self.Re * self.Sc * self.p_0 / self.p)
+        self.RR_analytical = ((self.c_plus** (self.m + 1) - self.c_minus** (self.m + 1))  / self.Delta) * (self.Re * self.Sc * self.p_0 / self.p)
 
 
     def plot_histograms_intervals(self,this_rho_c_reshape,this_rho_reshape,this_RR_reshape_DNS,wrinkling=1):
@@ -393,6 +393,7 @@ class data_binning_PDF(object):
     def compute_c_minus(self):
         '''
         :return: self.c_minus
+        Eq. 37
         '''
         # update c_0 and delta_0
         self.compute_c_0()

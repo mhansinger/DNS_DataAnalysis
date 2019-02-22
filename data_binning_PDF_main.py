@@ -165,7 +165,7 @@ class data_binning_PDF(object):
 
 
     @jit
-    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True, write_csv=False):
+    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.1, c_rho_max = 0.1818, histogram=True, write_csv=False):
         # run the analysis and compute the wrinkling factor -> real 3D cases
 
         self.write_csv = write_csv

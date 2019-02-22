@@ -108,7 +108,7 @@ class data_binning(object):
                     this_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
 
                     # check if threshold condition is reached
-                    if (this_set > self.threshold).any() and (this_set < self.c_rho_max).all():
+                    if (this_set.mean() > self.threshold) and (this_set < self.c_rho_max).all():
 
                         #compute c-bar
                         self.compute_cbar_wrinkling(this_set,i,j,k,histogram)
@@ -122,7 +122,7 @@ class data_binning(object):
         # get the density for the relevant points! it is stored in a different file!
         this_rho_reshape = self.rho_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute().reshape(self.filter_width**3)
 
-        # c without density
+        # c without de
         this_c_reshape= this_rho_c_reshape/this_rho_reshape
 
         this_rho_mean = this_rho_reshape.mean()
