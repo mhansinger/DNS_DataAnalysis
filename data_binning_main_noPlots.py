@@ -289,6 +289,8 @@ class data_binning(object):
                 file_name = 'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.csv' % (
                 this_c_bar, this_wrinkling, self.filter_width, self.case)
 
+                self.file_name_list.append(file_name)
+
                 if self.write_csv:
                     data_df.to_csv(join(self.output_path, file_name), index=False)
 
