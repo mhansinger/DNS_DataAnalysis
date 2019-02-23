@@ -38,12 +38,52 @@ class data_binning(object):
         self._c_0 = None
         self.c_plus = None
         self.c_minus = None
-        self.m = 4
-        print("\n m is hard coded with m=%f!\n" % self.m)
-        Re = 1000
-        Sc = 0.7
-        print("Re = %f" % Re)
-        print("Sc = %f" % Sc)
+        self.this_c_bar = None
+
+        if self.case=='1bar':
+            # NUMBER OF DNS CELLS IN X,Y,Z DIRECTION
+            self.Nx = 250
+            # PARAMETER FOR REACTION RATE
+            self.bfact = 7364.0
+            # REYNOLDS NUMBER
+            self.Re = 100
+            # DIMENSIONLESS DNS GRID SPACING, DOMAIN IS NOT UNITY
+            self.delta_x = 1/188
+            # PRESSURE [BAR]
+            self.p = 1
+        elif self.case=='5bar':
+            self.Nx = 560
+            self.bfact = 7128.3
+            self.Re = 500
+            self.delta_x = 1/432
+            self.p = 5
+        elif self.case=='10bar':
+            self.Nx = 795
+            self.bfact = 7128.3
+            self.Re = 1000
+            self.delta_x = 1/611
+            self.p = 10
+        elif self.case=='dummy_planar_flame':
+            # this is a dummy case with 50x50x50 entries!
+            print('\n################\nThis is the dummy test case!\n################\n')
+            self.Nx = 250
+            self.bfact = 7128.3 #7364.0
+            self.Re = 1000
+            self.delta_x = 1/611
+            self.p = 10
+        else:
+            raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
+
+        # for reaction rates
+        self.alpha = alpha
+        self.beta = beta
+        self.m = m
+        # SCHMIDT NUMBER
+        self.Sc = 0.7
+
+        # normalizing pressure
+        self.p_0 = 1
+
         #print()
         self.Delta = None
 
@@ -56,10 +96,12 @@ class data_binning(object):
 
         self.col_names = ['c_tilde','rho_bar','c_rho','rho','reactionRate']
 
+
     def dask_read_transform(self):
+        # DASK To Read in files
 
         try:
-            self.data_c = dd.read_csv(self.c_path,names=['rho_c'])
+            self.data_rho_c = dd.read_csv(self.c_path,names=['rho_c'])
         except:
             print('No data for C_rho')
 
@@ -70,11 +112,12 @@ class data_binning(object):
 
         # transform the data into an array and reshape
         self.rho_data_da = da.asarray(self.data_rho).reshape(self.Nx,self.Nx,self.Nx)
-        self.c_data_da = da.asarray(self.data_c).reshape(self.Nx,self.Nx,self.Nx)
+        #self.c_data_da = da.asarray(self.data_c).reshape(self.Nx,self.Nx,self.Nx)
+        self.rho_c_data_da = da.asarray(self.data_rho_c).reshape(self.Nx,self.Nx,self.Nx)
 
     @jit
-    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.099, c_rho_max = 0.1818,histogram=True ):
-        self.filter_width  =filter_width
+    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.099, c_rho_max = 0.1818, histogram=True):
+        self.filter_width = filter_width
         self.threshold = threshold
         self.interval = interval
         self.c_rho_max = c_rho_max
@@ -85,7 +128,7 @@ class data_binning(object):
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
 
                     # TEST VERSION
-                    this_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    this_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
 
                     # check if threshold condition is reached
                     if (this_set.mean() > self.threshold) and (this_set < self.c_rho_max).all():
@@ -96,24 +139,51 @@ class data_binning(object):
     @jit
     def run_analysis_wrinkling(self, filter_width = 8, interval = 2, threshold=0.05, c_rho_max = 0.183, histogram=False, write_csv=False):
         self.write_csv = write_csv
-        self.filter_width  =filter_width
+        self.filter_width = filter_width
         self.threshold = threshold
         self.interval = interval
         self.c_rho_max = c_rho_max
 
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta = (self.Sc * self.Re) / np.sqrt(self.p/self.p_0) * self.delta_x * self.filter_width
+
+        # LOOP OVER THE 3 DIMENSIONS
         count = 0
         for k in range(self.filter_width-1,self.Nx,self.interval):
             for j in range(self.filter_width - 1, self.Nx, self.interval):
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
 
-                    # TEST VERSION
-                    this_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    # this is the current data cube which constitutes the LES cell
+                    self.this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    # get the density for the relevant points! it is stored in a different file!
+                    self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                                        k - self.filter_width:k].compute()
+                    self.this_c_set = self.this_rho_c_set / self.this_rho_set
 
-                    # check if threshold condition is reached
-                    if (this_set.mean() > self.threshold) and (this_set < self.c_rho_max).all():
+                    # c_bar is computed
+                    self.this_c_bar = self.this_c_set.mean()
 
-                        #compute c-bar
-                        self.compute_cbar_wrinkling(this_set,i,j,k,histogram)
+                    ## CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
+                    ## (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
+                    #if c_min_thresh < self.this_c_bar <= c_max_thresh and self.c_bar_old != self.this_c_bar:
+
+                    #    self.c_bar_old = self.this_c_bar
+
+                    #    self.compute_RR(i,j,k,histogram)
+
+        #count = 0
+        #for k in range(self.filter_width-1,self.Nx,self.interval):
+        #    for j in range(self.filter_width - 1, self.Nx, self.interval):
+        #        for i in range(self.filter_width - 1, self.Nx, self.interval):
+#
+#                    # TEST VERSION
+#                    this_set = self.c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+#
+#                    # check if threshold condition is reached
+#                    if (this_set.mean() > self.threshold) and (this_set < self.c_rho_max).all():
+#
+#                        #compute c-bar
+#                        self.compute_cbar_wrinkling(this_set,i,j,k,histogram)
 
     @jit
     def compute_cbar(self,data_set,i,j,k,histogram):
@@ -435,6 +505,64 @@ class data_binning(object):
             # print("A_LES: ", this_magGrad)
             return this_magGrad_c
 
+    @jit
+    def compute_RR(self,i,j,k,histogram):
+        #compute c_bar without wrinkling factor
+
+        this_rho_c_reshape = self.this_rho_c_set.reshape(self.filter_width**3)
+        this_rho_reshape = self.this_rho_set.reshape(self.filter_width**3)
+
+        this_rho_c_mean = this_rho_c_reshape.mean()
+
+        this_rho_mean = this_rho_reshape.mean()
+
+        # c without density
+        this_c_reshape = self.this_c_set.reshape(self.filter_width**3) #this_rho_c_reshape / this_rho_reshape
+
+        # compute c_tilde: mean(rho*c)/mean(rho)
+        self.this_c_tilde = this_rho_c_mean / this_rho_mean
+
+        # compute the reaction rate of each cell     Eq (2.28) Senga documentation
+        # note that for Le=1: c=T, so this_c_reshape = this_T_reshape
+        exponent = - self.beta*(1-this_c_reshape) / (1 - self.alpha*(1 - this_c_reshape))
+        this_RR_reshape_DNS = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
+
+        this_RR_reshape_DNS[this_RR_reshape_DNS<0] = 0
+
+        # construct empty data array and fill it
+        data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
+        data_arr[:, 0] = self.this_c_tilde
+        data_arr[:, 1] = this_rho_mean
+        data_arr[:, 2] = this_rho_c_reshape
+        data_arr[:, 3] = this_rho_reshape
+        data_arr[:, 4] = this_RR_reshape_DNS
+        # data_arr[:, 5] = int(i)
+        # data_arr[:, 6] = int(j)
+        # data_arr[:, 7] = int(k)
+        #
+        data_df = pd.DataFrame(data_arr, columns=self.col_names)
+        file_name = 'c_tilde_%.5f_filter_%i_%s.csv' % (self.this_c_tilde, self.filter_width, self.case)
+
+        #############################################
+        # computation of the integration boundaries
+        self.compute_c_minus()
+        self.compute_c_plus()
+
+        print('\nc_bar: %.4f' % self.this_c_bar)
+        print('c_plus: ', self.c_plus)
+        print('c_minus: ', self.c_minus)
+        #print('c_0: ', self.c_0)
+        print('delta_0: ', self.get_delta_0(self.c_0))
+        print('Delta_LES: ', self.Delta)
+        #############################################
+
+        if self.write_csv:
+            data_df.to_csv(join(self.output_path, file_name), index=False)
+
+        #if histogram:
+        #    self.plot_histograms_intervals(this_rho_c_reshape=this_rho_c_reshape,
+        #                                   this_rho_reshape=this_rho_reshape,this_RR_reshape_DNS=this_RR_reshape_DNS)
+
     def write_file_list(self):
         # write only the file names with c_bar, and so on..
         with open(join(self.case,'filename.txt'), 'w') as f:
@@ -442,6 +570,64 @@ class data_binning(object):
                 f.write("%s\n" % item)
 
             f.close()
+
+
+    # compute self.delta_x_0
+    def get_delta_0(self,c):
+        '''
+        :param c: usually c_0
+        :param m: steepness of the flame front; not sure how computed
+        :return: computes self.delta_x_0, needed for c_plus and c_minus
+        Eq. 38
+        '''
+        return (1 - c ** self.m) / (1-c)
+
+    def compute_s(self):
+        self.s = np.exp(-self.Delta / 7) * ((np.exp(self.Delta / 7) - 1) *
+                                            np.exp(2 * (self.this_c_bar - 1) * self.m) + self.this_c_bar)
+
+
+    def compute_c_minus(self):
+        '''
+        :return: self.c_minus
+        Eq. 40
+        '''
+
+        # update s
+        self.compute_s()
+        this_delta_0_s = self.get_delta_0(self.s)
+
+        self.c_minus = (np.exp(self.this_c_bar*self.Delta*this_delta_0_s) - 1) / (np.exp(self.Delta) - 1)
+
+    def compute_c_m(self,xi):
+        '''
+        :param xi: spatial coordinate
+        :return:
+        Eq. 12
+        '''
+        return (1 + np.exp(-self.m * xi)) ** (-1 / self.m)
+
+    def compute_xi_m(self,c):
+        '''
+        :param c: Progress var
+        :return:
+        Eq. 13
+        '''
+        return 1 / self.m * np.log(c ** self.m / (1 - c ** self.m))
+
+    def compute_c_plus(self):
+        '''
+        :return: self.c_plus
+        '''
+        # update c_minus first! --> only this function is called in the end
+        self.compute_c_minus()
+
+        this_xi_c_minus = self.compute_xi_m(self.c_minus)
+
+        self.c_plus = self.compute_c_m(this_xi_c_minus+self.Delta)
+
+
+
 
 
 
