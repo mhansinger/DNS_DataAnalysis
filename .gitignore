@@ -6,3 +6,5 @@
 *.dat
 __pycache__
 
+plots
+
