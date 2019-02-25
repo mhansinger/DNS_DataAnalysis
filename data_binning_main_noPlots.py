@@ -67,7 +67,6 @@ class data_binning(object):
             # this is a dummy case with 50x50x50 entries!
             print('\n################\nThis is the dummy test case!\n################\n')
             self.Nx = 250
-<<<<<<< HEAD
             self.bfact = 7128.3 # 7364.0
             self.Re = 1000
             self.delta_x = 1/611
@@ -82,12 +81,7 @@ class data_binning(object):
             self.p = 1
             m = 4.5
             print('m is hard coded as m=4.5!')
-=======
-            self.bfact = 7128.3 #7364.0
-            self.Re = 1000
-            self.delta_x = 1/611
-            self.p = 10
->>>>>>> a42fdbe3b89edda84a920b80b5892742b480b918
+
         else:
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
 
