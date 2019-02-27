@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 m = 4.5
 Delta = 2.8
 
-c_bar = np.linspace(0,1,50)
+c_Verlauf = np.linspace(0,1,50)
 
 # check function for c_0
 def compute_c0(c, Delta):

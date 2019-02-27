@@ -68,10 +68,10 @@ class data_binning(object):
 
         # transform the data into an array and reshape
         self.rho_data_da = da.asarray(self.data_rho).reshape(self.Nx,self.Nx,self.Nx)
-        self.c_data_da = da.asarray(self.data_c).reshape(self.Nx,self.Nx,self.Nx)
+        self.c_data_da = da.asarray(self.data_c).reshape(self.Nx,self.Nx,self.Nx)       # actually c by rho
 
     @jit
-    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.099, c_rho_max = 0.1818,histogram=True ):
+    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.099, c_rho_max = 1,histogram=True ):
         self.filter_width  =filter_width
         self.threshold = threshold
         self.interval = interval
