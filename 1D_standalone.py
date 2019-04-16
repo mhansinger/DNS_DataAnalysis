@@ -1,30 +1,50 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-m = 4
+# latex rendering
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
 
-try:
-    c_verlauf = np.loadtxt('C_verlauf.txt')
-except:
-    c_path=input('Give the path to C_verlauf.txt')
-    c_verlauf = np.loadtxt(c_path)
+
+m = 4.4545
+beta = 6
+alpha = 9/11
+
+
+raw = np.loadtxt('/home/max/Documents/05_DNS_Data/Pfitzner/c_Verlauf_Pfitzner.txt')#np.linspace(0.0001,0.9999,100)
+
+xi = raw[:,0]
+c_verlauf = raw[:,1]
+
+# try:
+#     c_verlauf = np.loadtxt('C_verlauf.txt')
+# except:
+#     c_path=input('Give the path to C_verlauf.txt')
+#     c_verlauf = np.loadtxt(c_path)
 
 # check function for delta_0:
 def compute_delta0(c):
+
     return (1 - c ** m) / (1 - c)
 
-def compute_s(c,Delta):
-    s = np.exp(-Delta/7)*((np.exp(Delta/7) - 1) * np.exp(2 * (c-1) * m) + c)
+def compute_s(c,Delta_LES):
+    '''
+    Eq. 39
+    :param c:
+    :param Delta_LES:
+    :return:
+    '''
+    s = np.exp(-Delta_LES/7)*((np.exp(Delta_LES/7) - 1) * np.exp(2 * (c-1) * m) + c)
     return s
 
 
 # compute the values for c_minus
-def compute_c_minus(c,Delta):
+def compute_c_minus(c,Delta_LES):
     # Eq. 40
-    this_s = compute_s(c,Delta)
+    this_s = compute_s(c,Delta_LES)
     this_delta_0 = compute_delta0(this_s)
 
-    c_min = (np.exp(c * this_delta_0 * Delta) -1) / (np.exp(this_delta_0*Delta) - 1)
+    c_min = (np.exp(c * this_delta_0 * Delta_LES) -1) / (np.exp(this_delta_0*Delta_LES) - 1)
     return c_min
 
 
@@ -34,30 +54,57 @@ def compute_c_m(xi):
 def compute_xi_m(c):
     return 1/m * np.log(c**m /(1-c**m))
 
-def compute_c_plus(c,Delta):
+def analytical_omega(alpha,beta,c):
+    '''
+    Eq. 4
+    :param alpha:
+    :param beta:
+    :param c:
+    :return:
+    '''
+    exponent = - (beta * (1 - c)) / (1 - alpha * (1 - c))
+    Eigenval = 18.97 #beta**2 / 2 + beta*(3*alpha - 1.344)
+
+    print('Lambda:', Eigenval)
+
+    return Eigenval*((1-alpha*(1-c)))**(-1)*(1-c)*np.exp(exponent)
+
+
+def compute_c_plus(c_minus,Delta_LES):
     '''
     :param c: c_minus
     :return:
     Eq. 13
     '''
-    this_xi_m = compute_xi_m(c)
+    this_xi_m = compute_xi_m(c_minus)
 
-    this_c_plus = compute_c_m(this_xi_m+Delta)
+    xi_plus_Delta = this_xi_m+Delta_LES
+    this_c_plus = compute_c_m(xi_plus_Delta)
 
     return this_c_plus
 
-style = ['b','b--','r','r--']
+
+def model_omega(c):
+    '''
+    Eq. 14
+    :param c:
+    :return:
+    '''
+
+    return (m+1)*(1-c**m)*c**(m+1)
 
 
-def analytical_omega(alpha,beta,c):
-    exponent = - beta * (1 - c) / (1 - alpha * (1 - c))
-    Eigenval = beta**2 / 2 + beta*(3*alpha - 1.344)
+def compute_flamethickness():
+    '''
+    Eq. 17
+    :param m:
+    :return:
+    '''
 
-    print('Lambda:', Eigenval)
+    return (m + 1) ** (1 / m + 1) / m
 
-    return Eigenval*(1-c)*np.exp(exponent)
 
-def model_omega(c_plus,c_minus,Delta):
+def model_omega_bar(c_plus,c_minus,Delta_LES):
     '''
     :param c_plus:
     :param c_minus:
@@ -65,58 +112,137 @@ def model_omega(c_plus,c_minus,Delta):
     :return: omega Eq. 29
     '''
 
-    return (c_plus**(m+1) - c_minus**(m+1))/Delta
+    return (c_plus**(m+1) - c_minus**(m+1))/Delta_LES
 
+
+def compute_Delta_DNS(xi):
+    '''
+    Computes the Delta DNS in xi Coordinates
+    :param xi:
+    :return:
+    '''
+
+    flame_thickness = compute_flamethickness()
+
+    xi_range = abs(xi[0]) + abs(xi[-1])
+    stencil_width = xi_range/len(xi)
+
+    Delta_DNS = stencil_width #* flame_thickness # hier entfernt lauf Pfitzner
+
+    return Delta_DNS
+
+
+
+def where_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return np.where(array == array[idx])[0][0]
+
+
+style = ['b','b--','r','r--']
 
 plt.close('all')
 
-Deltas = [1,2,3,4,5,6,7,8,9,10,15,20]
 
-omega_verlauf = analytical_omega(alpha = 0.818, beta = 6, c = c_verlauf)
 
-fig, ax1 = plt.subplots(ncols=1, figsize=(6, 6))
+omega_verlauf = analytical_omega(alpha = alpha, beta = 6, c = c_verlauf)
+omega_model = model_omega(c_verlauf)
+
+plt.figure()
+fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
+
 ax2 = ax1.twinx()
 
-ax1.plot(c_verlauf,'b')
-ax2.plot(omega_verlauf,'r')
-ax2.set_ylabel('Reaction Rate', color='r')
-ax1.set_ylabel('Verlauf C', color='b')
-plt.title('C und omega 1D')
+ax1.plot(xi,c_verlauf,'b-',label=r'$c$')
+ax2.plot(xi,omega_verlauf,'r',label=r'$\dot{\omega}$ analytical')
+ax2.plot(xi,omega_model,'k',label=r'$\dot{\omega}$ model')
+ax2.set_ylabel(r'$\dot{\omega}$ [1/s]', color='k')
+ax2.axvspan(-5.5,2.5, alpha=0.2, color='orange')
+
+ax1.set_ylabel('c [-]', color='b')
+ax1.set_xlabel(r"$\xi$", color='k')
+plt.title("Progress variable and reaction rate")
+ax1.legend(loc='best', bbox_to_anchor=(0, 0, 0.75, 0.75))
+ax2.legend(loc='best', bbox_to_anchor=(0, 0, 0.95, 0.95))
+plt.xlabel('xi')
+plt.savefig('c_all2.pdf',format='pdf')
 plt.show(block=False)
 
-# loop over the different Filters
-for Delta in Deltas:
+# position of filters
+low = where_nearest(xi,-4)
+high = where_nearest(xi,0)
 
-    omega_analytic_list = []
-    omega_model_list = []
 
-    for i in range(0,len(c_verlauf)-Delta):
+# plot histogram of
+plt.figure(figsize=(6, 4))
+c_plot=c_verlauf[:]
+omega_mean = omega_verlauf[:].mean()
+plt.hist(c_plot,bins=60,normed=True,range=[0,1],)
+c_mean=c_plot.mean()
+plt.title('$p(c)$')
+plt.ylabel('Frequency')
+plt.xlabel('$c$')
+plt.text(0.12, 12, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
+plt.text(0.12, 10, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
+plt.savefig('histogram_all_c.pdf',format='pdf')
+plt.show()
 
-        this_c_bar = c_verlauf[i:i+Delta].mean()
-        this_analytical_omega_bar = omega_verlauf[i:i+Delta].mean()
 
-            # compute the boundaries:
-        this_c_minus = compute_c_minus(this_c_bar,Delta)
-        this_c_plus = compute_c_plus(this_c_minus,Delta)
 
-        this_model_omega_bar = model_omega(this_c_plus,this_c_minus, Delta )
+# compute Delta_DNS
+Delta_DNS = compute_Delta_DNS(xi)
 
-        print(' ')
-        print('c_bar: %.2f  c_minus: %.2f  c_plus: %.2f  analytical_omega: %.2f  model_omega: %.2f' %
-              (this_c_bar, this_c_minus, this_c_plus, this_analytical_omega_bar, this_model_omega_bar))
+Filter_width = [1,5,10,16,24,32,48,96]
 
-        omega_analytic_list.append(this_analytical_omega_bar)
-        omega_model_list.append(this_model_omega_bar)
-
-    plt.figure()
-    plt.title('Vergleich gefilterter omega für Delta = %i' % Delta)
-    plt.plot(omega_analytic_list)
-    plt.plot(omega_model_list)
-    plt.legend(['omega_bar_analytical','omega_bar_model'])
-    plt.savefig('Vergleich_Delta%i.png' % Delta)
-
-    plt.show(block=False)
-
+plt.figure()
+#
+# # loop over the different Filters
+# for Filter in Filter_width:
+#
+#     omega_analytic_list = []
+#     omega_model_list = []
+#     c_bar_list = []
+#
+#     Delta_LES = Delta_DNS * Filter
+#
+#     for i in range(0,len(c_verlauf) - Filter):
+#
+#         this_c_bar = c_verlauf[i:i + Filter].mean()
+#         this_analytical_omega_bar = omega_verlauf[i:i + Filter].mean()
+#
+#         # compute the boundaries:
+#         this_c_minus = compute_c_minus(c = this_c_bar,Delta_LES=Delta_LES)
+#         this_c_plus = compute_c_plus(c_minus=this_c_minus,Delta_LES=Delta_LES)
+#
+#         this_model_omega_bar = model_omega_bar(this_c_plus,this_c_minus, Delta_LES=Delta_LES )
+#
+#         print(' ')
+#         print('c_bar: %.2f  c_minus: %.2f  c_plus: %.2f  analytical_omega: %.2f  model_omega: %.2f' %
+#               (this_c_bar, this_c_minus, this_c_plus, this_analytical_omega_bar, this_model_omega_bar))
+#
+#         omega_analytic_list.append(this_analytical_omega_bar)
+#         omega_model_list.append(this_model_omega_bar)
+#         c_bar_list.append(this_c_bar)
+#
+#     # plt.plot(xi[:-Filter],omega_analytic_list)
+#     # plt.title('omega_numerical')
+#     # plt.xlabel('xi')
+#     # plt.savefig('plots/Omega_numerical_xi.png')
+#
+#     plt.figure()
+#     plt.title('Delta_LES = %.3f Delta_DNS = %.3f Filter=%i'% (Delta_LES,Delta_DNS,Filter))
+#     plt.plot(c_bar_list,omega_analytic_list,'k')
+#     plt.plot(c_bar_list,omega_model_list,'r')
+#     plt.xlabel('c_bar')
+#     plt.ylabel('omega_bar')
+#     plt.legend(['omega_bar_numerical','omega_bar_model'])
+#     plt.savefig('plots/Vergleich_Delta_LES_%.3f.png' % Delta_LES)
+#
+#     #plt.figure()
+#
+#
+#     plt.show(block=False)
+#
 
 
 
