@@ -76,6 +76,17 @@ class data_binning_PDF(object):
             self.Re = 1000
             self.delta_x = 1/611
             self.p = 10
+        elif self.case.startswith('NX512'):
+            # check: Parameter_PlanarFlame.xlsx
+            self.Nx = 512
+            self.bfact = 3675
+            self.Re = 50
+            self.delta_x = 1/120
+            self.p = 1
+            m = 4.4545
+            beta=6
+            alpha=0.81818
+
         else:
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
 

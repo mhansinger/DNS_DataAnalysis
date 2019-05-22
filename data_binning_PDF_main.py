@@ -3,7 +3,7 @@ This is to read in the binary data File for the high pressure bunsen data
 
 @author: mhansinger
 
-last change: 13.12.2018
+last change: May 2019
 '''
 
 import numpy as np
@@ -22,7 +22,7 @@ import gc
 
 class data_binning_PDF(object):
 
-    def __init__(self, case, m, alpha, beta, bins):
+    def __init__(self, case, bins):
         '''
         # CONSTRUCTOR
         :param case:    case name: 1bar, 5bar or 10bar
@@ -62,12 +62,18 @@ class data_binning_PDF(object):
             self.Re = 500
             self.delta_x = 1/432
             self.p = 5
+            m = 4.4545
+            beta=6
+            alpha=0.81818
         elif self.case=='10bar':
             self.Nx = 795
             self.bfact = 7128.3
             self.Re = 1000
             self.delta_x = 1/611
             self.p = 10
+            m = 4.4545
+            beta=6
+            alpha=0.81818
         elif self.case=='dummy_planar_flame':
             # this is a dummy case with 50x50x50 entries!
             print('\n################\nThis is the dummy test case!\n################\n')
@@ -76,6 +82,16 @@ class data_binning_PDF(object):
             self.Re = 100
             self.delta_x = 1/188
             self.p = 1
+        elif self.case.startswith('NX512'):
+            # check: Parameter_PlanarFlame.xlsx
+            self.Nx = 512
+            self.bfact = 3675
+            self.Re = 50
+            self.delta_x = 1/120
+            self.p = 1
+            m = 4.4545
+            beta=6
+            alpha=0.81818
         else:
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
 
@@ -88,17 +104,20 @@ class data_binning_PDF(object):
         self.p_0 = 1
 
         # TO BE COMPUTED
-        self._c_bar = None
+        self.c_bar = None
 
         self._c_0 = None
         self.c_plus = None
         self.c_minus = None
+        self.omega_bar_model = None
+        self.wrinkling_factor=None
+        self.RR_DNS = None              #Reaction rate computed from DNS Data
 
         # SCHMIDT NUMBER
         self.Sc = 0.7
 
-        # DELTA: NORMALIZED FILTERWIDTH
-        self.Delta = None # --> is computed in self.run_analysis !
+        # DELTA_LES: NORMALIZED FILTERWIDTH
+        self.Delta_LES = None # --> is computed in self.run_analysis !
 
         # checks if output directory exists
         self.output_path = join(case,'output_test')
@@ -111,6 +130,7 @@ class data_binning_PDF(object):
         print('Nr. of grid points: %i' % self.Nx)
         print("Re = %f" % self.Re)
         print("Sc = %f" % self.Sc)
+        print("dx_DNS = %f" % self.delta_x)
 
         # CONSTRUCTOR END
         ########################
@@ -141,7 +161,7 @@ class data_binning_PDF(object):
         self.c_rho_max = c_rho_max
 
         # Compute the scaled Delta (Pfitzner PDF)
-        self.Delta = self.Sc * self.Re / np.sqrt(self.p/self.p_0) * self.delta_x * self.filter_width
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
 
         count = 0
         for k in range(self.filter_width-1,self.Nx,self.interval):
@@ -165,34 +185,46 @@ class data_binning_PDF(object):
 
 
     @jit
-    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, threshold=0.1, c_rho_max = 0.1818, histogram=True, write_csv=False):
+    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, c_min_thresh=0.01, c_max_thresh = 0.99, histogram=False, write_csv=False):
         # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
 
         self.write_csv = write_csv
-        self.filter_width  =filter_width
-        self.threshold = threshold
+        self.filter_width = filter_width
+        #self.threshold = threshold
         self.interval = interval
-        self.c_rho_max = c_rho_max
+        #self.c_rho_max = c_rho_max
 
         # Compute the scaled Delta (Pfitzner PDF)
-        self.Delta = self.Sc * self.Re / np.sqrt(self.p/self.p_0) * self.delta_x * self.filter_width
+        self.Delta_LES= self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
 
+        # loop over the DNS Data
         count = 0
         for k in range(self.filter_width-1,self.Nx,self.interval):
             for j in range(self.filter_width - 1, self.Nx, self.interval):
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
 
-                    # TEST VERSION
-                    this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    # this is the current data cube which constitutes the LES cell
+                    self.this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    # get the density for the relevant points! it is stored in a different file!
+                    self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                                        k - self.filter_width:k].compute()
+                    self.this_c_set = self.this_rho_c_set / self.this_rho_set
 
-                    print(min(this_rho_c_set))
+                    # c_bar is computed
+                    self.c_bar = self.this_c_set.mean()
 
-                    # check if threshold condition is reached
-                    if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
+                    # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
+                    # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
+                    if c_min_thresh < self.c_bar <= c_max_thresh and self.c_bar_old != self.c_bar:
 
-                        #compute c-bar
-                        self.compute_cbar_wrinkling(this_rho_c_set,i,j,k,histogram)
+                        # does not make sense
+                        self.c_bar_old = self.c_bar
 
+                        self.compute_wrinkling_RR(i,j,k,histogram)
+
+    # REMOVE THIS FUNCTION?
     @jit
     def compute_cbar(self,data_set,i,j,k,histogram):
         #compute c_bar without wrinkling factor
@@ -209,6 +241,8 @@ class data_binning_PDF(object):
 
         # c_bar is computed
         this_c_bar = this_c_reshape.mean()
+
+        self.set_c_bar(this_c_bar)
 
         # compute c_tilde: mean(rho*c)/mean(rho)
         c_tilde = this_rho_c_mean / this_rho_mean
@@ -251,7 +285,7 @@ class data_binning_PDF(object):
                                                this_rho_reshape=this_rho_reshape,c_bar=this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
 
 
-    def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
+    def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,this_RR_reshape_DNS):
         # plot the c_tilde and c, both normalized
 
         c_max = 0.182363
@@ -306,11 +340,11 @@ class data_binning_PDF(object):
 
         #fig.tight_layout()
         plt.suptitle('c_tilde = %.3f; c_bar = %.3f; wrinkling = %.3f; RR_mean_DNS = %.2f; RR_mean_LES = %.2f\n' %
-                     (c_tilde,c_bar,wrinkling,this_RR_reshape_DNS.mean(),RR_LES_mean) )
-        fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (c_bar, wrinkling,self.filter_width, self.case))
+                     (c_tilde,self.c_bar,self.wrinkling_factor,this_RR_reshape_DNS.mean(),RR_LES_mean) )
+        fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (self.c_bar, self.wrinkling_factor,self.filter_width, self.case))
         plt.savefig(fig_name)
 
-        print('c_bar: ', c_bar)
+        print('c_bar: ', self.c_bar)
         print(' ')
 
         # plt.figure()
@@ -385,21 +419,24 @@ class data_binning_PDF(object):
 
 
     @jit
-    def compute_cbar_wrinkling(self,data_set,i,j,k,histogram):
+    def compute_wrinkling_RR(self,i,j,k,histogram):
         # this is to compute with the wrinkling factor and c_bar
 
-        this_rho_c_reshape = data_set.reshape(self.filter_width**3)
+        this_rho_c_reshape = self.this_rho_c_set.reshape(self.filter_width**3)
+        this_rho_reshape = self.this_rho_set.reshape(self.filter_width**3)
 
         this_rho_c_mean = this_rho_c_reshape.mean()
 
-        # get the density for the relevant points! it is stored in a different file!
-        this_rho_reshape = self.rho_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute().reshape(self.filter_width**3)
+        this_rho_mean = this_rho_reshape.mean()
 
         # c without density
-        this_c_reshape = this_rho_c_reshape / this_rho_reshape
+        this_c_reshape = self.this_c_set.reshape(self.filter_width**3) #this_rho_c_reshape / this_rho_reshape
+
+        # compute c_tilde: mean(rho*c)/mean(rho)
+        self.this_c_tilde = this_rho_c_mean / this_rho_mean
 
         # c_bar is computed
-        this_c_bar = this_c_reshape.mean()
+        #self.c_bar = this_c_reshape.mean()
 
         this_rho_mean = this_rho_reshape.mean()
 
@@ -411,14 +448,16 @@ class data_binning_PDF(object):
         exponent = - self.beta*(1-this_c_reshape) / (1 - self.alpha*(1 - this_c_reshape))
         this_RR_reshape_DNS = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
 
+        self.RR_DNS = this_RR_reshape_DNS
+
         # another criteria
-        if 0.01 < this_c_bar < 0.999: #0.7 < this_c_bar < 0.9:
+        if 0.01 < self.c_bar < 0.99: #0.7 < this_c_bar < 0.9:
             #print(this_c_reshape)
-            print("c_bar: ",this_c_bar)
-            this_wrinkling = self.get_wrinkling(this_c_bar,i,j,k)
+            print("c_bar: ",self.c_bar)
+            self.wrinkling_factor = self.get_wrinkling(i,j,k)
 
             # consistency check, wrinkling factor needs to be >1!
-            if this_wrinkling >= 1:
+            if self.wrinkling_factor >= 1:
                 # construct empty data array and fill it
                 data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
                 data_arr[:, 0] = c_tilde
@@ -432,22 +471,29 @@ class data_binning_PDF(object):
                 #
                 data_df = pd.DataFrame(data_arr, columns=self.col_names)
                 file_name = 'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.csv' % (
-                this_c_bar, this_wrinkling, self.filter_width, self.case)
+                self.c_bar, self.wrinkling_factor, self.filter_width, self.case)
+
+                ###############################################
+                # Pfitzner's model
+                self.compute_Pfitzner_model()
+                # so far no values are written to files
+                ###############################################
+
 
                 if self.write_csv:
                     data_df.to_csv(join(self.output_path, file_name), index=False)
 
                 if histogram:
                     self.plot_histograms(c_tilde=c_tilde, this_rho_c_reshape=this_rho_c_reshape,
-                                         this_rho_reshape=this_rho_reshape, c_bar=this_c_bar,
-                                         this_RR_reshape_DNS=this_RR_reshape_DNS, wrinkling=this_wrinkling)
+                                         this_rho_reshape=this_rho_reshape,
+                                         this_RR_reshape_DNS=this_RR_reshape_DNS)
                     # self.plot_histograms()
                 # print('c_tilde: ', c_tilde)
 
                 # plot the surface in the box if wrinkling > 10
-                if this_wrinkling > 10:
+                if self.wrinkling_factor > 100:
                     file_name_3D_plot = 'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s_ISO_surface.png' % (
-                    this_c_bar, this_wrinkling, self.filter_width, self.case)
+                    self.c_bar, self.wrinkling_factor, self.filter_width, self.case)
 
                     c_3D = this_c_reshape.reshape(self.filter_width,self.filter_width,self.filter_width)
 
@@ -461,10 +507,10 @@ class data_binning_PDF(object):
                 print("##################\n")
 
     @jit
-    def get_wrinkling(self,this_cbar,i,j,k):
+    def get_wrinkling(self,i,j,k):
         # computes the wriknling factor from resolved and filtered flame surface
         #print(i)
-        this_A_LES = self.get_A_LES(this_cbar,i,j,k)
+        this_A_LES = self.get_A_LES(i,j,k)
 
         this_A_DNS = self.get_A_DNS(i,j,k)
 
@@ -510,7 +556,7 @@ class data_binning_PDF(object):
         return this_DNS_magGrad_c.sum() / (self.filter_width**3)
 
     @jit
-    def get_A_LES(self,this_cbar,i,j,k):
+    def get_A_LES(self,i,j,k):
         # computes the filtered iso surface area
 
         if i - self.filter_width < 0 or j - self.filter_width < 0 or k - self.filter_width < 0:
@@ -576,53 +622,101 @@ class data_binning_PDF(object):
             # print("A_LES: ", this_magGrad)
             return this_magGrad_c
 
+
+
     # added Nov. 2018: Implementation of Pfitzner's analytical boundaries
     # getter and setter for c_Mean as a protected
     def set_c_bar(self,c_bar):
-        self._c_bar = c_bar
+        self.c_bar = c_bar
 
     def get_c_bar(self):
-        return self._c_bar
+        return self.c_bar
+
+    def compute_flamethickness(self):
+        '''
+        Eq. 17 according to analytical model (not numerical!)
+        :param m:
+        :return: flame thicknes dth
+        '''
+
+        return (self.m + 1) ** (1 / self.m + 1) / self.m
 
     # compute self.delta_x_0
-    def get_delta_0(self,c):
+    def compute_delta_0(self,c):
         '''
+        Eq. 38
         :param c: usually c_0
         :param m: steepness of the flame front; not sure how computed
         :return: computes self.delta_x_0, needed for c_plus and c_minus
         '''
         return (1 - c ** self.m) / (1-c)
 
-    def compute_c_0(self,c_bar):
+    def compute_c_m(self,xi):
+        #Eq. 12
+        return (1 + np.exp(- self.m * xi)) ** (-1 / self.m)
+
+    def compute_xi_m(self,c):
+        # Eq. 13
+        return 1 / self.m * np.log(c ** self.m / (1 - c ** self.m))
+
+    def compute_s(self,c):
         '''
-        :param c: c_bar.
-        :param self.Delta: this is the scaled filter width. -> is ocmputed before
-        :param m: steepness of the flame front; not sure how computed
-        :return: c_0
+        EVTL MUSS FILTERWIDTH NOCH SKALIERT WERDEN!
+        Sc*Re/sqrt(p/p0)
+        Eq. 39
+        :param c:
+        :param Delta_LES:
+        :return:
+        '''
+        s = np.exp( - self.Delta_LES / 7) * ((np.exp(self.Delta_LES / 7) - 1) * np.exp(2 * (c - 1) * self.m) + c)
+        return s
+
+    # compute the values for c_minus
+    def compute_c_minus(self):
+        # Eq. 40
+        this_s = self.compute_s(self.c_bar)
+        this_delta_0 = self.compute_delta_0(this_s)
+
+        self.c_minus = (np.exp(self.c_bar * this_delta_0 * self.Delta_LES) - 1) / (np.exp(this_delta_0 * self.Delta_LES) - 1)
+
+
+    def compute_c_plus(self):
+        '''
+        :param c: c_minus
+        :return:
+        Eq. 13
+        '''
+        this_xi_m = self.compute_xi_m(self.c_minus)
+
+        xi_plus_Delta = this_xi_m + self.Delta_LES
+        self.c_plus = self.compute_c_m(xi_plus_Delta)
+
+    def compute_model_omega_bar(self):
+        '''
+        :param c_plus:
+        :param c_minus:
+        :param Delta:
+        :return: omega Eq. 29
         '''
 
-        self._c_0=(1-c_bar)*np.exp(-self.Delta/7) + (1 - np.exp(-self.Delta/7))*(1-np.exp(-2*(1-c_bar)*self.m))
+        self.omega_bar_model = (self.c_plus ** (self.m + 1) - self.c_minus ** (self.m + 1)) / self.Delta_LES
 
-    def compute_c_minus(self,c_bar):
+    def compute_Pfitzner_model(self):
         '''
-        :param c_bar:
-        :return: self.c_minus
+        computes the model values in sequential manner
         '''
-        # update c_0 and delta_0
-        self.compute_c_0(c_bar = c_bar)
-        this_delta_0 = self.get_delta_0(c=(1-self._c_0))
 
-        self.c_minus = (np.exp(c_bar * this_delta_0 * (1-c_bar) * self.Delta)-1) / \
-                       (np.exp(this_delta_0 * (1-self._c_0)*self.Delta) -1)
+        print('c_bar is: ',self.c_bar)
+        self.compute_c_minus()
+        print('c_minus is: ',self.c_minus)
 
-    def compute_c_plus(self,c_bar):
-        '''
-        :return: self.c_plus
-        '''
-        # update c_minus
-        self.compute_c_minus(c_bar)
+        self.compute_c_plus()
+        print('c_plus is: ', self.c_plus)
 
-        self.c_plus = (self.c_minus * np.exp(self.Delta)) / (1 + self.c_minus*(np.exp(self.Delta)-1))
+        self.compute_model_omega_bar()
+
+        print('omega_m is: ', self.omega_bar_model)
+        print('omega_DNS is: ', self.RR_DNS)
 
 
 
