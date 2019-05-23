@@ -198,6 +198,8 @@ class data_binning_PDF(object):
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES= self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
         print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
 
         # loop over the DNS Data
         count = 0
@@ -217,10 +219,10 @@ class data_binning_PDF(object):
 
                     # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
                     # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
-                    if c_min_thresh < self.c_bar <= c_max_thresh and self.c_bar_old != self.c_bar:
+                    if c_min_thresh < self.c_bar <= c_max_thresh: # and self.c_bar_old != self.c_bar:
 
-                        # does not make sense
-                        self.c_bar_old = self.c_bar
+                        # # does not make sense
+                        # self.c_bar_old = self.c_bar
 
                         self.compute_wrinkling_RR(i,j,k,histogram)
 
@@ -453,7 +455,9 @@ class data_binning_PDF(object):
         # another criteria
         if 0.01 < self.c_bar < 0.99: #0.7 < this_c_bar < 0.9:
             #print(this_c_reshape)
-            print("c_bar: ",self.c_bar)
+            # print("c_bar: ",self.c_bar)
+
+            # COMPUTE WRINKLING FACTOR
             self.wrinkling_factor = self.get_wrinkling(i,j,k)
 
             # consistency check, wrinkling factor needs to be >1!
@@ -607,16 +611,16 @@ class data_binning_PDF(object):
 
             this_magGrad_c = np.sqrt(this_grad_X ** 2 + this_grad_Y ** 2 + this_grad_Z ** 2)
 
-            # print('i - 2*%f' % self.filter_width)
-            print('this_c_north mean %f' % this_c_north.mean())
-            print('this_c_south mean %f' % this_c_south.mean())
-            print('this_c_west mean %f' % this_c_west.mean())
-            print('this_c_east mean %f' % this_c_east.mean())
-            print('this_c_down mean %f' % this_c_down.mean())
-            print('this_c_up mean %f' % this_c_up.mean())
-            print('this_grad_X', this_grad_X)
-            print('this_grad_Y', this_grad_Y)
-            print('this_grad_Z', this_grad_Z)
+            # # print('i - 2*%f' % self.filter_width)
+            # print('this_c_north mean %f' % this_c_north.mean())
+            # print('this_c_south mean %f' % this_c_south.mean())
+            # print('this_c_west mean %f' % this_c_west.mean())
+            # print('this_c_east mean %f' % this_c_east.mean())
+            # print('this_c_down mean %f' % this_c_down.mean())
+            # print('this_c_up mean %f' % this_c_up.mean())
+            # print('this_grad_X', this_grad_X)
+            # print('this_grad_Y', this_grad_Y)
+            # print('this_grad_Z', this_grad_Z)
             print('A_LES: ', this_magGrad_c)
 
             # print("A_LES: ", this_magGrad)
@@ -701,6 +705,33 @@ class data_binning_PDF(object):
 
         self.omega_bar_model = (self.c_plus ** (self.m + 1) - self.c_minus ** (self.m + 1)) / self.Delta_LES
 
+
+    def model_omega(self,c):
+        '''
+        Eq. 14
+        :param c:
+        :return: Computes the omega from the model for c_bar!
+        '''
+
+        return (self.m + 1) * (1 - c ** self.m) * c ** (self.m + 1)
+
+
+    def analytical_omega(self, c):
+        '''
+        Eq. 4
+        :param alpha:
+        :param beta:
+        :param c:
+        :return: computes the analytical omega for given c_bar!
+        '''
+        exponent = - (self.beta * (1 - c)) / (1 - self.alpha * (1 - c))
+        Eigenval = 18.97  # beta**2 / 2 + beta*(3*alpha - 1.344)
+
+        print('Lambda:', Eigenval)
+
+        return Eigenval * ((1 - self.alpha * (1 - c))) ** (-1) * (1 - c) * np.exp(exponent)
+
+
     def compute_Pfitzner_model(self):
         '''
         computes the model values in sequential manner
@@ -715,23 +746,15 @@ class data_binning_PDF(object):
 
         self.compute_model_omega_bar()
 
+        this_omega_model_cbar = self.model_omega(self.c_bar)
+        this_omega_analytical_cbar = self.analytical_omega(self.c_bar)
+
         print('omega_m is: ', self.omega_bar_model)
-        print('omega_DNS is: ', self.RR_DNS)
-
-
-
-# if __name__ == "__main__":
-#
-#     print('Starting 1bar case!')
-#     filter_widths=[16,32]
-#
-#     for f in filter_widths:
-#         # RENEW!!!
-#         bar1 = data_binning_PDF(case='1bar',m=4.8,  alpha=0.81818, beta=6, bins=20)
-#         bar1.dask_read_transform()
-#         print('\nRunning with filter width: %i' % f)
-#         bar1.run_analysis_wrinkling(filter_width=f, interval=8, histogram=True)
-#         del bar1
+        print('omega_DNS is: ', np.mean(self.RR_DNS))
+        print('Delta_LES is: ',self.Delta_LES)
+        print('omega_model(c_bar): ', this_omega_model_cbar)
+        print('omega_analytical(c_bar): ', this_omega_analytical_cbar)
+        print('###########################\n')
 
 
 
