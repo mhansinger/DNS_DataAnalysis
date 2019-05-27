@@ -105,6 +105,7 @@ class data_binning_PDF(object):
 
         # TO BE COMPUTED
         self.c_bar = None
+        self.rho_bar = None
 
         self._c_0 = None
         self.c_plus = None
@@ -216,6 +217,7 @@ class data_binning_PDF(object):
 
                     # c_bar is computed
                     self.c_bar = self.this_c_set.mean()
+                    self.rho_bar = self.this_rho_set.mean()
 
                     # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
                     # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
@@ -450,6 +452,9 @@ class data_binning_PDF(object):
         exponent = - self.beta*(1-this_c_reshape) / (1 - self.alpha*(1 - this_c_reshape))
         this_RR_reshape_DNS = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
 
+        this_RR_reshape_DNS_Pfitz  = 18.97 * ((1 - self.alpha * (1 - this_c_reshape))) ** (-1) * (1 - this_c_reshape) * np.exp(exponent)
+
+        self.RR_DNS_Pfitz = this_RR_reshape_DNS_Pfitz
         self.RR_DNS = this_RR_reshape_DNS
 
         # another criteria
@@ -726,10 +731,14 @@ class data_binning_PDF(object):
         '''
         exponent = - (self.beta * (1 - c)) / (1 - self.alpha * (1 - c))
         Eigenval = 18.97  # beta**2 / 2 + beta*(3*alpha - 1.344)
+        # --> Eigenval ist wahrscheinlich falsch!
 
-        print('Lambda:', Eigenval)
+        #print('Lambda:', Eigenval)
 
-        return Eigenval * ((1 - self.alpha * (1 - c))) ** (-1) * (1 - c) * np.exp(exponent)
+        om_Klein = self.bfact*self.rho_bar*(1-c)*np.exp(exponent)
+        om_Pfitzner = Eigenval * ((1 - self.alpha * (1 - c))) ** (-1) * (1 - c) * np.exp(exponent)
+
+        return om_Klein, om_Pfitzner
 
 
     def compute_Pfitzner_model(self):
@@ -747,13 +756,15 @@ class data_binning_PDF(object):
         self.compute_model_omega_bar()
 
         this_omega_model_cbar = self.model_omega(self.c_bar)
-        this_omega_analytical_cbar = self.analytical_omega(self.c_bar)
+        omega_Klein, omega_Pfitzner = self.analytical_omega(self.c_bar)
 
-        print('omega_m is: ', self.omega_bar_model)
-        print('omega_DNS is: ', np.mean(self.RR_DNS))
+        print('omega_bar_model is: ', self.omega_bar_model)
+        print('omega_bar_DNS is: ', np.mean(self.RR_DNS))
+        print('omega_bar_DNS_Pfitz is: ', np.mean(self.RR_DNS_Pfitz))
         print('Delta_LES is: ',self.Delta_LES)
         print('omega_model(c_bar): ', this_omega_model_cbar)
-        print('omega_analytical(c_bar): ', this_omega_analytical_cbar)
+        print('omega_analytical_Klein(c_bar): ', omega_Klein)
+        print('omega_analytical_Pfitzner(c_bar): ', omega_Pfitzner)
         print('###########################\n')
 
 
