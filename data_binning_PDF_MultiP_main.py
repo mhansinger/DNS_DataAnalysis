@@ -4,6 +4,10 @@ This is to read in the binary data File for the high pressure bunsen data
 @author: mhansinger
 
 last change: May 2019
+
+removed all plotting funcitons
+
+REWRITTEN FOR DASK DELAYED
 '''
 
 import numpy as np
@@ -13,14 +17,19 @@ import os
 from os.path import join
 import dask.dataframe as dd
 import dask.array as da
-from numba import jit
-from mayavi import mlab
+import dask
+from dask.distributed import Client
+# from numba import jit
+# from mayavi import mlab
 # to free memory
 import gc
 
 
 
-class data_binning_PDF(object):
+dask.config.set(scheduler='threads')  # overwrite default with threaded scheduler
+
+
+class data_binning_PDF_dask(object):
 
     def __init__(self, case, bins):
         '''
@@ -117,12 +126,14 @@ class data_binning_PDF(object):
         # SCHMIDT NUMBER
         self.Sc = 0.7
 
+        # COUNTER
+        self.counter = 0
+
+        #DASK DELAYED LIST
+        self.delayed_list = []
+
         # DELTA_LES: NORMALIZED FILTERWIDTH
         self.Delta_LES = None # --> is computed in self.run_analysis !
-
-        #Data array to store the results
-        self.dataArray_np = np.zeros(7)
-        self.data_flag = True
 
         # checks if output directory exists
         self.output_path = join(case,'output_test')
@@ -152,7 +163,7 @@ class data_binning_PDF(object):
         except:
             print('No data for rho')
 
-        print('Read in data...')
+        print('Read in data ...\n')
         # transform the data into an array and reshape
         #self.rho_data_da = da.asarray(self.data_rho).reshape(self.Nx,self.Nx,self.Nx)
         #self.rho_c_data_da = da.asarray(self.data_rho_c).reshape(self.Nx,self.Nx,self.Nx)
@@ -160,40 +171,8 @@ class data_binning_PDF(object):
         self.rho_data_da = self.data_rho.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
         self.rho_c_data_da = self.data_rho_c.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
 
-    @jit
-    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
-        # run the analysis without computation of wrinkling factor -> planar flame (dummy case)
-
-        self.filter_width =filter_width
-        self.threshold = threshold
-        self.interval = interval
-        self.c_rho_max = c_rho_max
-
-        # Compute the scaled Delta (Pfitzner PDF)
-        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
-
-        count = 0
-        for k in range(self.filter_width-1,self.Nx,self.interval):
-            for j in range(self.filter_width - 1, self.Nx, self.interval):
-                for i in range(self.filter_width - 1, self.Nx, self.interval):
-
-                    # TEST VERSION
-                    # this is the current data cube which constitutes the LES cell
-                    this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
-
-                    #print(this_rho_c_set)
-
-                    # check if threshold condition is reached
-                    # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
-                    if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
-
-                        #print('If criteria erreicht!')
-                        #compute c-bar
-
-                        self.compute_cbar(this_rho_c_set,i,j,k,histogram)
 
 
-    @jit
     def run_analysis_wrinkling(self,filter_width = 8, interval = 2, c_min_thresh=0.01, c_max_thresh = 0.99, histogram=False, write_csv=False):
         # run the analysis and compute the wrinkling factor -> real 3D cases
         # interval is like nth point, skips some nodes
@@ -209,255 +188,73 @@ class data_binning_PDF(object):
         print('Delta_LES is: %.3f' % self.Delta_LES)
         flame_thickness = self.compute_flamethickness()
         print('Flame thickness: ',flame_thickness)
+        print(' ')
 
         # loop over the DNS Data
         count = 0
         for k in range(self.filter_width-1,self.Nx,self.interval):
+            #print('k ',k)
             for j in range(self.filter_width - 1, self.Nx, self.interval):
+                #print('j ', j)
                 for i in range(self.filter_width - 1, self.Nx, self.interval):
+                   # print('i ',i)
+
+                    #self.counter += 1
+                    #print('Counter: ',self.counter)
 
                     # this is the current data cube which constitutes the LES cell
-                    self.this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k]
+                    this_rho_c_set = self.compute_this_rho_c_set(i,j,k)
+
                     # get the density for the relevant points! it is stored in a different file!
-                    self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
-                                        k - self.filter_width:k]
-                    self.this_c_set = self.this_rho_c_set / self.this_rho_set
+                    this_rho_set = self.compute_this_rho_set(i,j,k)
+
+                    this_c_set = self.compute_this_c_set(this_rho_c_set,this_rho_set)
 
                     # c_bar is computed
-                    self.c_bar = self.this_c_set.mean()
-                    self.rho_bar = self.this_rho_set.mean()
+                    c_bar = this_c_set.mean()
+                    rho_bar = this_rho_set.mean()
 
                     # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
                     # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
-                    if c_min_thresh < self.c_bar <= c_max_thresh: # and self.c_bar_old != self.c_bar:
+                    if c_min_thresh < c_bar <= c_max_thresh: # and self.c_bar_old != self.c_bar:
 
-                        self.compute_wrinkling_RR(i,j,k,histogram)
-
-                        if self.data_flag:
-                            #update the data array for output
-                            this_data_vec = np.array([self.c_bar,self.wrinkling_factor,self.RR_DNS,self.RR_DNS_Pfitz,self.omega_bar_model,self.c_plus,self.c_minus])
-                            self.dataArray_np =np.vstack([self.dataArray_np,this_data_vec])
-
-        # write data to csv file
-        filename = join(self.case,'filter_width_'+str(self.filter_width)+'.csv')
-        dataArray_pd = pd.DataFrame(data=self.dataArray_np,columns=['c_bar','wrinkling','omega_DNS_Klein','omega_DNS_Pfitzner','omega_model','c_plus','c_minus'])
-        dataArray_pd.to_csv(filename,index=False)
-        print('Data has been written.')
+                        # # does not make sense
+                        # self.c_bar_old = self.c_bar
+                        self.compute_wrinkling_RR(i,j,k,this_rho_c_set,this_rho_set,this_c_set)
 
 
-    # REMOVE THIS FUNCTION?
-    @jit
-    def compute_cbar(self,data_set,i,j,k,histogram):
-        #compute c_bar without wrinkling factor
+    # DASK FUNCTIONS
 
-        this_rho_c_reshape = data_set.reshape(self.filter_width**3)
-        this_rho_c_mean = this_rho_c_reshape.mean()
-
-        # get the density for the relevant points! it is stored in a different file!
-        this_rho_reshape = self.rho_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute().reshape(self.filter_width**3)
-        this_rho_mean = this_rho_reshape.mean()
-
-        # c without density
-        this_c_reshape = this_rho_c_reshape / this_rho_reshape
-
-        # c_bar is computed
-        this_c_bar = this_c_reshape.mean()
-
-        self.set_c_bar(this_c_bar)
-
-        # compute c_tilde: mean(rho*c)/mean(rho)
-        c_tilde = this_rho_c_mean / this_rho_mean
-
-        # compute the reaction rate of each cell     Eq (2.28) Senga documentation
-        # note that for Le=1: c=T, so this_c_reshape = this_T_reshape
-        exponent = - self.beta*(1-this_c_reshape) / (1 - self.alpha*(1 - this_c_reshape))
-        this_RR_reshape_DNS = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
-
-        # another criteria
-        if this_c_bar < 0.99:
-            # construct empty data array and fill it
-            data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
-            data_arr[:, 0] = c_tilde
-            data_arr[:, 1] = this_rho_mean
-            data_arr[:, 2] = this_rho_c_reshape
-            data_arr[:, 3] = this_rho_reshape
-            data_arr[:, 4] = this_RR_reshape_DNS
-            #data_arr[:, 5] = int(i)
-            #data_arr[:, 6] = int(j)
-            #data_arr[:, 7] = int(k)
-            #
-            data_df = pd.DataFrame(data_arr, columns=self.col_names)
-            file_name = 'c_tilde_%.5f_filter_%i_%s.csv' % (c_tilde, self.filter_width, self.case)
-
-            #############################################
-            # computation of the integration boundaries
-            self.compute_c_minus(this_c_bar)
-            self.compute_c_plus(this_c_bar)
-            print('c_plus: ',self.c_plus)
-            #############################################
-
-            if self.write_csv:
-                data_df.to_csv(join(self.output_path, file_name), index=False)
-
-            if histogram:
-                #self.plot_histograms(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,this_rho_reshape=this_rho_reshape,
-                #                     c_bar = this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
-                self.plot_histograms_intervals(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,
-                                               this_rho_reshape=this_rho_reshape,c_bar=this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
+    def compute_this_rho_c_set(self,i,j,k):
+        return self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k]
 
 
-    def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,this_RR_reshape_DNS):
-        # plot the c_tilde and c, both normalized
-
-        c_max = 0.182363
-
-        fig, (ax0, ax1) = plt.subplots(ncols=2, figsize=(10, 4))
-        ax0.hist(this_rho_c_reshape,bins=self.bins,normed=True,edgecolor='black', linewidth=0.7)
-        ax0.set_title('rho*c')
-        ax0.set_xlim(0,c_max)
-
-        # compute the mean reaction rate for the single bins
-        sorted_rho_c_reshape = np.sort(this_rho_c_reshape)
-        idx = np.unravel_index(np.argsort(this_rho_c_reshape, axis=None), this_rho_c_reshape.shape)
-        sorted_RR_reshape_DNS = np.array([x for y, x in sorted(zip(this_rho_c_reshape,this_RR_reshape_DNS))])
-
-        hist, bin_edges = np.histogram(this_rho_c_reshape, bins=self.bins)
-
-        try:
-            # check if dimensions are correct
-            assert hist.sum() == self.filter_width**3
-        except:
-            print('Check the filter width and histogram')
-
-        probability_c = hist/hist.sum()
-
-        RR_LES_mean = 0
-        RR_interval = 0
-        counter = 0
-
-        for id, val in enumerate(hist):
-            RR_interval = sorted_RR_reshape_DNS[counter:counter+val].mean()
-            RR_LES_mean = RR_LES_mean + (RR_interval*probability_c[id])
-
-            counter = counter + val
-
-        print('RR_LES_mean: ', RR_LES_mean)
-
-        ###################################
-
-        this_c_reshape = this_rho_c_reshape/this_rho_reshape
-        #ax1.hist(this_c_reshape,bins=self.bins,normed=True,edgecolor='black', linewidth=0.7)
-        ax1.set_title('c')
-        ax1.set_xlim(0,1)
-
-        ax2 = ax1.twinx()
-        color = 'r'
-        ax2.set_ylabel('Reaction Rate', color=color)
-        # ax2.scatter(this_c_reshape, this_RR_reshape_DNS,color=color,s=0.9)
-        # ax1.hist(this_RR_reshape_DNS/this_RR_reshape_DNS.max(), bins=self.bins,normed=True,color=color,alpha=0.5,edgecolor='black', linewidth=0.7)
-        ax1.hist(this_c_reshape, bins=self.bins, normed=True, edgecolor='black', linewidth=0.7)
-        ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=0.9)
-        ax2.set_ylim(0,90)
-
-        #fig.tight_layout()
-        plt.suptitle('c_tilde = %.3f; c_bar = %.3f; wrinkling = %.3f; RR_mean_DNS = %.2f; RR_mean_LES = %.2f\n' %
-                     (c_tilde,self.c_bar,self.wrinkling_factor,this_RR_reshape_DNS.mean(),RR_LES_mean) )
-        fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (self.c_bar, self.wrinkling_factor,self.filter_width, self.case))
-        plt.savefig(fig_name)
-
-        print('c_bar: ', self.c_bar)
-        print(' ')
-
-        # plt.figure()
-        # plt.title('c_tilde = %.5f' % c_tilde)
-        # plt.subplot(211)
-        # plt.hist(this_rho_c_reshape,bins=self.bins,normed=True)
-        # plt.title('rho x c')
-        #
-        # plt.subplot(221)
-        # plt.hist(this_rho_c_reshape/this_rho_reshape,bins=self.bins,normed=True)
-        # plt.title('c')
+    def compute_this_rho_set(self,i,j,k):
+        return self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,k - self.filter_width:k]
 
 
-    def plot_histograms_intervals(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
-        # plot c, RR, and integration boundaries c_plus, c_minus
-
-        fig, (ax1) = plt.subplots(ncols=1, figsize=(10, 4))
-        # ax0.hist(this_rho_c_reshape,bins=self.bins,normed=True,edgecolor='black', linewidth=0.7)
-        # ax0.set_title('rho*c')
-        # ax0.set_xlim(0,c_max)
-
-        # compute the mean reaction rate for the single bins
-        sorted_rho_c_reshape = np.sort(this_rho_c_reshape)
-        idx = np.unravel_index(np.argsort(this_rho_c_reshape, axis=None), this_rho_c_reshape.shape)
-        sorted_RR_reshape_DNS = np.array([x for y, x in sorted(zip(this_rho_c_reshape,this_RR_reshape_DNS))])
-
-        hist, bin_edges = np.histogram(this_rho_c_reshape/this_rho_reshape, bins=self.bins)
-
-        try:
-            # check if dimensions are correct
-            assert hist.sum() == self.filter_width**3
-        except:
-            print('Check the filter width and histogram')
-
-        probability_c = hist/hist.sum()
-
-        RR_LES_mean = 0
-        RR_interval = 0
-        counter = 0
-
-        for id, val in enumerate(hist):
-            RR_interval = sorted_RR_reshape_DNS[counter:counter+val].mean()
-            RR_LES_mean = RR_LES_mean + (RR_interval*probability_c[id])
-
-            counter = counter + val
-
-        # GARBAGE COLLECT FREE MEMORY
-        gc.collect()
-        #print('RR_LES_mean: ', RR_LES_mean)
-
-        ###################################
-
-        this_c_reshape = this_rho_c_reshape/this_rho_reshape
-        ax1.set_title('c')
-        ax1.set_xlim(0,1)
-
-        ax2 = ax1.twinx()
-        color = 'r'
-        ax2.set_ylabel('Reaction Rate', color=color)
-        ax1.hist(this_c_reshape, bins=self.bins, normed=True, edgecolor='black', linewidth=0.7)
-        ax2.scatter(this_c_reshape, this_RR_reshape_DNS, color=color, s=0.9)
-        ax2.set_ylim(0,90)
-
-        #fig.tight_layout()
-        plt.suptitle('c_bar = %.3f;  RR_mean_DNS = %.2f; c_plus = %.2f; c_minus = %.2f \n' %
-                     (c_bar,this_RR_reshape_DNS.mean(),self.c_plus,self.c_minus))
-        fig_name = join(self.output_path,'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.png' % (c_bar, wrinkling,self.filter_width, self.case))
-        plt.savefig(fig_name)
-
-        print('c_bar: ', c_bar)
-        print(' ')
+    def compute_this_c_set(self,this_rho_c_set,this_rho_set):
+        return this_rho_c_set / this_rho_set
 
 
-    @jit
-    def compute_wrinkling_RR(self,i,j,k,histogram):
+    def compute_wrinkling_RR(self,i,j,k,this_rho_c_set,this_rho_set,this_c_set):
         # this is to compute with the wrinkling factor and c_bar
 
-        this_rho_c_reshape = self.this_rho_c_set.reshape(self.filter_width**3)
-        this_rho_reshape = self.this_rho_set.reshape(self.filter_width**3)
+        this_rho_c_reshape = this_rho_c_set.reshape(self.filter_width**3)
+        this_rho_reshape = this_rho_set.reshape(self.filter_width**3)
 
         this_rho_c_mean = this_rho_c_reshape.mean()
 
         this_rho_mean = this_rho_reshape.mean()
 
         # c without density
-        this_c_reshape = self.this_c_set.reshape(self.filter_width**3) #this_rho_c_reshape / this_rho_reshape
+        this_c_reshape = this_c_set.reshape(self.filter_width**3) #this_rho_c_reshape / this_rho_reshape
 
         # compute c_tilde: mean(rho*c)/mean(rho)
         self.this_c_tilde = this_rho_c_mean / this_rho_mean
 
         # c_bar is computed
-        #self.c_bar = this_c_reshape.mean()
+        c_bar = this_c_reshape.mean()
 
         this_rho_mean = this_rho_reshape.mean()
 
@@ -475,16 +272,17 @@ class data_binning_PDF(object):
         self.RR_DNS = this_RR_reshape_DNS
 
         # another criteria
-        if 0.01 < self.c_bar < 0.99: #0.7 < this_c_bar < 0.9:
+        if 0.01 < c_bar < 0.99: #0.7 < this_c_bar < 0.9:
             #print(this_c_reshape)
             # print("c_bar: ",self.c_bar)
 
             # COMPUTE WRINKLING FACTOR
             self.wrinkling_factor = self.get_wrinkling(i,j,k)
+            print('\nDASK WRINKLING FACT: ',self.wrinkling_factor)
+            print(' ')
 
             # consistency check, wrinkling factor needs to be >1!
             if self.wrinkling_factor >= 1:
-                self.data_flag=True
                 # construct empty data array and fill it
                 # data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
                 # data_arr[:, 0] = c_tilde
@@ -502,39 +300,37 @@ class data_binning_PDF(object):
 
                 ###############################################
                 # Pfitzner's model
-                self.compute_Pfitzner_model()
+                # self.compute_Pfitzner_model()
                 # so far no values are written to files
                 ###############################################
 
 
-                if self.write_csv:
-                    data_df.to_csv(join(self.output_path, file_name), index=False)
+                # if self.write_csv:
+                #     data_df.to_csv(join(self.output_path, file_name), index=False)
 
-                if histogram:
-                    self.plot_histograms(c_tilde=c_tilde, this_rho_c_reshape=this_rho_c_reshape,
-                                         this_rho_reshape=this_rho_reshape,
-                                         this_RR_reshape_DNS=this_RR_reshape_DNS)
+                # if histogram:
+                #     self.plot_histograms(c_tilde=c_tilde, this_rho_c_reshape=this_rho_c_reshape,
+                #                          this_rho_reshape=this_rho_reshape,
+                #                          this_RR_reshape_DNS=this_RR_reshape_DNS)
                     # self.plot_histograms()
                 # print('c_tilde: ', c_tilde)
 
-                # plot the surface in the box if wrinkling > 10
-                if self.wrinkling_factor > 100:
-                    file_name_3D_plot = 'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s_ISO_surface.png' % (
-                    self.c_bar, self.wrinkling_factor, self.filter_width, self.case)
-
-                    c_3D = this_c_reshape.reshape(self.filter_width,self.filter_width,self.filter_width)
-
-                    mlab.contour3d(c_3D)
-                    mlab.savefig(join(self.output_path,file_name_3D_plot))
-                    mlab.close()
+                # # plot the surface in the box if wrinkling > 10
+                # if self.wrinkling_factor > 100:
+                #     file_name_3D_plot = 'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s_ISO_surface.png' % (
+                #     self.c_bar, self.wrinkling_factor, self.filter_width, self.case)
+                #
+                #     c_3D = this_c_reshape.reshape(self.filter_width,self.filter_width,self.filter_width)
+                #
+                #     mlab.contour3d(c_3D)
+                #     mlab.savefig(join(self.output_path,file_name_3D_plot))
+                #     mlab.close()
 
             else:
                 print("##################")
                 print("Computed Nonsense!")
                 print("##################\n")
-                self.data_flag=False
 
-    @jit
     def get_wrinkling(self,i,j,k):
         # computes the wriknling factor from resolved and filtered flame surface
         #print(i)
@@ -547,7 +343,6 @@ class data_binning_PDF(object):
 
         return this_A_DNS/this_A_LES
 
-    @jit
     def get_A_DNS(self,i,j,k):
         # computes the flame surface area in the DNS based on gradients of c of neighbour cells
         width = 1
@@ -583,7 +378,7 @@ class data_binning_PDF(object):
 
         return this_DNS_magGrad_c.sum() / (self.filter_width**3)
 
-    @jit
+
     def get_A_LES(self,i,j,k):
         # computes the filtered iso surface area
 
@@ -619,12 +414,12 @@ class data_binning_PDF(object):
                           k - self.filter_width:k] / this_rho_east
 
             this_c_north = self.rho_c_data_da[i:i + self.filter_width, j - self.filter_width:j,
-                           k - self.filter_width:k] / this_rho_north
+                           k - self.filter_width:k]/ this_rho_north
             this_c_south = self.rho_c_data_da[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
                            k - self.filter_width:k] / this_rho_south
 
             this_c_up = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
-                        k:k + self.filter_width] / this_rho_up
+                        k:k + self.filter_width]/ this_rho_up
             this_c_down = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
                           k - 2 * self.filter_width:k - self.filter_width] / this_rho_down
 
