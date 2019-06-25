@@ -56,6 +56,9 @@ class data_binning_PDF(object):
             self.delta_x = 1/188
             # PRESSURE [BAR]
             self.p = 1
+            m = 4.4545
+            beta=6
+            alpha=0.81818
         elif self.case=='5bar':
             self.Nx = 560
             self.bfact = 7128.3
@@ -87,7 +90,7 @@ class data_binning_PDF(object):
             self.Nx = 512
             self.bfact = 3675
             self.Re = 50
-            self.delta_x = 1/120
+            self.delta_x = 1/220    # Klein nochmal fragen! -> 220 sollte stimmen!
             self.p = 1
             m = 4.4545
             beta=6
@@ -235,8 +238,9 @@ class data_binning_PDF(object):
 
                         if self.data_flag:
                             #update the data array for output
-                            this_data_vec = np.array([self.c_bar,self.wrinkling_factor,self.RR_DNS,self.RR_DNS_Pfitz,self.omega_bar_model,self.c_plus,self.c_minus])
-                            self.dataArray_np =np.vstack([self.dataArray_np,this_data_vec])
+                            this_data_vec = np.array([self.c_bar,self.wrinkling_factor,np.mean(self.RR_DNS),np.mean(self.RR_DNS_Pfitz),self.omega_bar_model,self.c_plus,self.c_minus])
+                            # append the data
+                            self.dataArray_np = np.vstack([self.dataArray_np,this_data_vec])
 
         # write data to csv file
         filename = join(self.case,'filter_width_'+str(self.filter_width)+'.csv')
