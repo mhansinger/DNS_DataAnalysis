@@ -3,7 +3,7 @@ This is to read in the binary data File for the high pressure bunsen data
 
 @author: mhansinger
 
-last change: May 2019
+last change: June 2019
 '''
 
 import numpy as np
@@ -45,7 +45,7 @@ class data_binning_PDF(object):
         # Filter width of the LES cell: is filled later
         self.filter_width = None
 
-        if self.case=='1bar':
+        if self.case is '1bar':
             # NUMBER OF DNS CELLS IN X,Y,Z DIRECTION
             self.Nx = 250
             # PARAMETER FOR REACTION RATE
@@ -77,7 +77,7 @@ class data_binning_PDF(object):
             m = 4.4545
             beta=6
             alpha=0.81818
-        elif self.case=='dummy_planar_flame':
+        elif self.case is 'dummy_planar_flame':
             # this is a dummy case with 50x50x50 entries!
             print('\n################\nThis is the dummy test case!\n################\n')
             self.Nx = 150
@@ -87,6 +87,17 @@ class data_binning_PDF(object):
             self.p = 1
         elif self.case.startswith('NX512'):
             # check: Parameter_PlanarFlame.xlsx
+            self.Nx = 512
+            self.bfact = 3675
+            self.Re = 50
+            self.delta_x = 1/220    # Klein nochmal fragen! -> 220 sollte stimmen!
+            self.p = 1
+            m = 4.4545
+            beta=6
+            alpha=0.81818
+        elif self.case is 'planar_flame_test':
+            # check: Parameter_PlanarFlame.xlsx
+            print('\n################\nThis is the laminar planar test case!\n################\n')
             self.Nx = 512
             self.bfact = 3675
             self.Re = 50
@@ -215,32 +226,67 @@ class data_binning_PDF(object):
 
         # loop over the DNS Data
         count = 0
-        for k in range(self.filter_width-1,self.Nx,self.interval):
-            for j in range(self.filter_width - 1, self.Nx, self.interval):
-                for i in range(self.filter_width - 1, self.Nx, self.interval):
+        if self.case is 'planar_flame_test':
+            for k in range(146, 366):
+                for j in range(146, 366):
+                    for i in range(146, 366):
 
-                    # this is the current data cube which constitutes the LES cell
-                    self.this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k]
-                    # get the density for the relevant points! it is stored in a different file!
-                    self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
-                                        k - self.filter_width:k]
-                    self.this_c_set = self.this_rho_c_set / self.this_rho_set
+                        # this is the current data cube which constitutes the LES cell
+                        self.this_rho_c_set = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                                              k - self.filter_width:k]
+                        # get the density for the relevant points! it is stored in a different file!
+                        self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                                            k - self.filter_width:k]
+                        self.this_c_set = self.this_rho_c_set / self.this_rho_set
 
-                    # c_bar is computed
-                    self.c_bar = self.this_c_set.mean()
-                    self.rho_bar = self.this_rho_set.mean()
+                        # c_bar is computed
+                        self.c_bar = self.this_c_set.mean()
+                        self.rho_bar = self.this_rho_set.mean()
 
-                    # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
-                    # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
-                    if c_min_thresh < self.c_bar <= c_max_thresh: # and self.c_bar_old != self.c_bar:
+                        # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
+                        # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
+                        if c_min_thresh < self.c_bar <= c_max_thresh:  # and self.c_bar_old != self.c_bar:
 
-                        self.compute_wrinkling_RR(i,j,k,histogram)
+                            self.compute_wrinkling_RR(i, j, k, histogram)
 
-                        if self.data_flag:
-                            #update the data array for output
-                            this_data_vec = np.array([self.c_bar,self.wrinkling_factor,np.mean(self.RR_DNS),np.mean(self.RR_DNS_Pfitz),self.omega_bar_model,self.c_plus,self.c_minus])
-                            # append the data
-                            self.dataArray_np = np.vstack([self.dataArray_np,this_data_vec])
+                            if self.data_flag:
+                                # update the data array for output
+                                this_data_vec = np.array([self.c_bar, self.wrinkling_factor, np.mean(self.RR_DNS),
+                                                          np.mean(self.RR_DNS_Pfitz), self.omega_bar_model, self.c_plus,
+                                                          self.c_minus])
+                                # append the data
+                                self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
+
+        else:
+            for k in range(self.filter_width - 1, self.Nx, self.interval):
+                for j in range(self.filter_width - 1, self.Nx, self.interval):
+                    for i in range(self.filter_width - 1, self.Nx, self.interval):
+
+                        # this is the current data cube which constitutes the LES cell
+                        self.this_rho_c_set = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                                              k - self.filter_width:k]
+                        # get the density for the relevant points! it is stored in a different file!
+                        self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                                            k - self.filter_width:k]
+                        self.this_c_set = self.this_rho_c_set / self.this_rho_set
+
+                        # c_bar is computed
+                        self.c_bar = self.this_c_set.mean()
+                        self.rho_bar = self.this_rho_set.mean()
+
+                        # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
+                        # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
+                        if c_min_thresh < self.c_bar <= c_max_thresh:  # and self.c_bar_old != self.c_bar:
+
+                            self.compute_wrinkling_RR(i, j, k, histogram)
+
+                            if self.data_flag:
+                                # update the data array for output
+                                this_data_vec = np.array([self.c_bar, self.wrinkling_factor, np.mean(self.RR_DNS),
+                                                          np.mean(self.RR_DNS_Pfitz), self.omega_bar_model, self.c_plus,
+                                                          self.c_minus])
+                                # append the data
+                                self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
 
         # write data to csv file
         filename = join(self.case,'filter_width_'+str(self.filter_width)+'.csv')
@@ -511,8 +557,8 @@ class data_binning_PDF(object):
                 ###############################################
 
 
-                if self.write_csv:
-                    data_df.to_csv(join(self.output_path, file_name), index=False)
+                # if self.write_csv:
+                #     data_df.to_csv(join(self.output_path, file_name), index=False)
 
                 if histogram:
                     self.plot_histograms(c_tilde=c_tilde, this_rho_c_reshape=this_rho_c_reshape,
