@@ -18,6 +18,8 @@ from mayavi import mlab
 # to free memory
 import gc
 from dask import delayed
+import scipy as sp
+import scipy.ndimage
 
 #TODO
 # anpassen des LES Gradienten!
@@ -131,6 +133,10 @@ class data_binning_PDF(object):
         self.wrinkling_factor=None
         self.RR_DNS = None              #Reaction rate computed from DNS Data
 
+        # FILTERING
+        self.c_filtered = np.zeros((self.Nx,self.Nx,self.Nx))
+        self.rho_filtered = np.zeros((self.Nx,self.Nx,self.Nx))
+
         # SCHMIDT NUMBER
         self.Sc = 0.7
 
@@ -170,10 +176,7 @@ class data_binning_PDF(object):
             print('No data for rho')
 
         print('Read in data...')
-        # transform the data into an array and reshape
-        #self.rho_data_da = da.asarray(self.data_rho).reshape(self.Nx,self.Nx,self.Nx)
-        #self.rho_c_data_da = da.asarray(self.data_rho_c).reshape(self.Nx,self.Nx,self.Nx)
-
+        # transform the data into an array and reshape it to 3D
         self.rho_data_da = self.data_rho.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
         self.rho_c_data_da = self.data_rho_c.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
 
@@ -208,6 +211,10 @@ class data_binning_PDF(object):
                         #compute c-bar
 
                         self.compute_cbar(this_rho_c_set,i,j,k,histogram)
+
+    # def apply_gauss_filter(self):
+    #     # filter c and rho data set
+    #    self.rho_filtered = sp.ndimage.filters.gaussian_filter(self.rho_data_da, sigma_xy, truncate=1.0, mode='reflect')
 
 
     @jit

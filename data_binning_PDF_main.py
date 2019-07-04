@@ -22,6 +22,8 @@ from dask import delayed
 #TODO
 # anpassen des LES Gradienten!
 # implement Gauss filter?
+# re-write the whole filtering process!
+# create a filtered data set first!
 
 class data_binning_PDF(object):
 
@@ -682,6 +684,40 @@ class data_binning_PDF(object):
             return 1000
 
         else:
+            # # old version
+            # # get the neighbour rho data
+            # this_rho_west = self.rho_data_da[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
+            #                 k - self.filter_width:k]
+            # this_rho_east = self.rho_data_da[i - self.filter_width:i, j:j + self.filter_width,
+            #                 k - self.filter_width:k]
+            #
+            # this_rho_north = self.rho_data_da[i:i + self.filter_width, j - self.filter_width:j,
+            #                  k - self.filter_width:k]
+            # this_rho_south = self.rho_data_da[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
+            #                  k - self.filter_width:k]
+            #
+            # this_rho_up = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            #               k:k + self.filter_width]
+            # this_rho_down = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            #                 k - 2 * self.filter_width:k - self.filter_width]
+            #
+            # # get the neighbour c data
+            # this_c_west = self.rho_c_data_da[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
+            #               k - self.filter_width:k] / this_rho_west
+            # this_c_east = self.rho_c_data_da[i - self.filter_width:i, j:j + self.filter_width,
+            #               k - self.filter_width:k] / this_rho_east
+            #
+            # this_c_north = self.rho_c_data_da[i:i + self.filter_width, j - self.filter_width:j,
+            #                k - self.filter_width:k] / this_rho_north
+            # this_c_south = self.rho_c_data_da[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
+            #                k - self.filter_width:k] / this_rho_south
+            #
+            # this_c_up = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            #             k:k + self.filter_width] / this_rho_up
+            # this_c_down = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            #               k - 2 * self.filter_width:k - self.filter_width] / this_rho_down
+
+            # new version
             # get the neighbour rho data
             this_rho_west = self.rho_data_da[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
                             k - self.filter_width:k]
