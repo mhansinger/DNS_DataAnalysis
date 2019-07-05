@@ -181,11 +181,11 @@ class data_binning_PDF(object):
 
         print('Read in data...')
         # transform the data into an array and reshape it to 3D
-        self.rho_data_da = self.data_rho.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
-        self.rho_c_data_da = self.data_rho_c.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
+        self.rho_data_np = self.data_rho.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
+        self.rho_c_data_np = self.data_rho_c.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
 
         # progress variable
-        self.c_data_da =  self.rho_c_data_da / self.rho_data_da
+        self.c_data_np=  self.rho_c_data_np / self.rho_data_np
 
     @jit
     def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
@@ -206,7 +206,7 @@ class data_binning_PDF(object):
 
                     # TEST VERSION
                     # this is the current data cube which constitutes the LES cell
-                    this_rho_c_set = self.rho_c_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+                    this_rho_c_set = self.rho_c_data_np[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
 
                     #print(this_rho_c_set)
 
@@ -223,9 +223,9 @@ class data_binning_PDF(object):
         # filter c and rho data set with gauss filter function
         print('Apply Gaussian filter...')
         sigma_xy = [self.filter_width, self.filter_width ,self.filter_width]
-        self.rho_filtered = sp.ndimage.filters.gaussian_filter(self.rho_data_da, sigma_xy, truncate=1.0, mode='reflect')
+        self.rho_filtered = sp.ndimage.filters.gaussian_filter(self.rho_data_np, sigma_xy, truncate=1.0, mode='reflect')
 
-        self.c_filtered = sp.ndimage.filters.gaussian_filter(self.rho_c_data_da/self.rho_data_da, sigma_xy, truncate=1.0, mode='reflect')
+        self.c_filtered = sp.ndimage.filters.gaussian_filter(self.rho_c_data_np/self.rho_data_np, sigma_xy, truncate=1.0, mode='reflect')
 
 
     @jit
@@ -284,10 +284,10 @@ class data_binning_PDF(object):
                     for i in range(self.filter_width - 1, self.Nx, self.interval):
 
                         # # this is the current data cube which constitutes the LES cell
-                        # self.this_rho_c_set = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                        # self.this_rho_c_set = self.rho_c_data_np[i - self.filter_width:i, j - self.filter_width:j,
                         #                       k - self.filter_width:k]
                         # # get the density for the relevant points! it is stored in a different file!
-                        # self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+                        # self.this_rho_set = self.rho_data_np[i - self.filter_width:i, j - self.filter_width:j,
                         #                     k - self.filter_width:k]
                         # self.this_c_set = self.this_rho_c_set / self.this_rho_set
                         #
@@ -321,10 +321,10 @@ class data_binning_PDF(object):
 
     def compute_loop_analysis(self, i, j, k, c_min_thresh, c_max_thresh, histogram):
         # this is the current data cube which constitutes the LES cell
-        self.this_rho_c_set = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+        self.this_rho_c_set = self.rho_c_data_np[i - self.filter_width:i, j - self.filter_width:j,
                               k - self.filter_width:k]
         # get the density for the relevant points! it is stored in a different file!
-        self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+        self.this_rho_set = self.rho_data_np[i - self.filter_width:i, j - self.filter_width:j,
                             k - self.filter_width:k]
         self.this_c_set = self.this_rho_c_set / self.this_rho_set
 
@@ -481,6 +481,7 @@ class data_binning_PDF(object):
 
 
     def set_gaussian_kernel(self):
+        # wird vermutlich nicht gebraucht...
         size = int(self.filter_width)
         vector = np.linspace(-self.filter_width,self.filter_width,2*self.filter_width+1)
         x,y,z = np.meshgrid(vector, vector, vector)
@@ -544,7 +545,6 @@ class data_binning_PDF(object):
                 # so far no values are written to files
                 ###############################################
 
-
                 # if self.write_csv:
                 #     data_df.to_csv(join(self.output_path, file_name), index=False)
 
@@ -595,10 +595,10 @@ class data_binning_PDF(object):
         this_DNS_gradZ = this_DNS_gradX.copy()
         this_DNS_magGrad_c = this_DNS_gradX.copy()
 
-        this_rho_c_data = self.rho_c_data_da[i -(self.filter_width+1):(i + 1), (j - 1) - self.filter_width:(j + 1),
+        this_rho_c_data = self.rho_c_data_np[i -(self.filter_width+1):(i + 1), (j - 1) - self.filter_width:(j + 1),
                       k - (self.filter_width+1):(k + 1)]
 
-        this_rho_data = self.rho_data_da[(i - 1) - self.filter_width:(i + 1), (j - 1) - self.filter_width:(j + 1),
+        this_rho_data = self.rho_data_np[(i - 1) - self.filter_width:(i + 1), (j - 1) - self.filter_width:(j + 1),
                       k - (self.filter_width+1):(k + 1)]
 
         #print("this rho_c_data.max(): ", (this_rho_c_data/this_rho_data))
@@ -634,9 +634,9 @@ class data_binning_PDF(object):
         for l in range(1,self.Nx-1):
             for m in range(1,self.Nx-1):
                 for n in range(1,self.Nx-1):
-                    this_DNS_gradX = (self.c_data_da[l+1, m, n] - self.c_data_da[l-1,m, n])/(2 * self.delta_x)
-                    this_DNS_gradY = (self.c_data_da[l, m+1, n] - self.c_data_da[l, m-1, n]) / (2 * self.delta_x)
-                    this_DNS_gradZ = (self.c_data_da[l, m, n+1]- self.c_data_da[l, m, n-1]) / (2 * self.delta_x)
+                    this_DNS_gradX = (self.c_data_np[l+1, m, n] - self.c_data_np[l-1,m, n])/(2 * self.delta_x)
+                    this_DNS_gradY = (self.c_data_np[l, m+1, n] - self.c_data_np[l, m-1, n]) / (2 * self.delta_x)
+                    this_DNS_gradZ = (self.c_data_np[l, m, n+1]- self.c_data_np[l, m, n-1]) / (2 * self.delta_x)
                     # compute the magnitude of the gradient
                     this_DNS_magGrad_c = np.sqrt(this_DNS_gradX**2 + this_DNS_gradY**2 + this_DNS_gradZ**2)
 
@@ -664,23 +664,29 @@ class data_binning_PDF(object):
 
 
     def filter_DNS_grad(self):
+    # compute filtered DNS reaction rate
+        # create empty array
+        self.grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
 
-        #TODO
-        # do the Gauss filter thing from scipy again ...
+        sigma_xy = [self.filter_width, self.filter_width ,self.filter_width]
+        self.grad_DNS_filtered = sp.ndimage.filters.gaussian_filter(self.grad_c_DNS, sigma_xy, truncate=1.0, mode='reflect')
+        
+    def compute_RR_DNS(self):
+        # according to Pfitzner implementation
+        exponent = - self.beta*(1-self.c_data_np.reshape(self.Nx**3)) / (1 - self.alpha*(1 - self.c_data_np.reshape(self.Nx**3)))
+        #this_RR_reshape_DNS = self.bfact*self.rho_data_np.reshape(self.Nx**3)*(1-self.c_data_np.reshape(self.Nx**3))*np.exp(exponent)
 
-        # print('Filter DNS gradient ... ')
-        # # Fertig machen!
-        # # create empty array
-        # self.grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
-        #
-        # for l in range(1, self.Nx - 1):
-        #     for m in range(1, self.Nx - 1):
-        #         for n in range(1, self.Nx - 1):
-        #             this_LES_gradX = (self.c_filtered[l + 1, m, n] - self.c_filtered[l - 1, m, n]) / (2 * self.delta_x)
-        #             this_LES_gradY = (self.c_filtered[l, m + 1, n] - self.c_filtered[l, m - 1, n]) / (2 * self.delta_x)
-        #             this_LES_gradZ = (self.c_filtered[l, m, n + 1] - self.c_filtered[l, m, n - 1]) / (2 * self.delta_x)
-        #             # compute the magnitude of the gradient
-        #             this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
+        this_RR_reshape_DNS_Pfitz  = 18.97 * ((1 - self.alpha * (1 - self.c_data_np.reshape(self.Nx**3)))) ** (-1) \
+                                     * (1 - self.c_data_np.reshape(self.Nx**3)) * np.exp(exponent)
+
+        self.RR_DNS = this_RR_reshape_DNS_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
+
+        del exponent
+        del this_RR_reshape_DNS_Pfitz
+
+    #TODO
+    # Fehlt noch das selbe mit LES RR
+
 
 
     @jit
@@ -697,35 +703,35 @@ class data_binning_PDF(object):
 
         else:
             # get the neighbour rho data
-            this_rho_west = self.rho_data_da[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
+            this_rho_west = self.rho_data_np[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
                             k - self.filter_width:k]
-            this_rho_east = self.rho_data_da[i - self.filter_width:i, j:j + self.filter_width,
+            this_rho_east = self.rho_data_np[i - self.filter_width:i, j:j + self.filter_width,
                             k - self.filter_width:k]
 
-            this_rho_north = self.rho_data_da[i:i + self.filter_width, j - self.filter_width:j,
+            this_rho_north = self.rho_data_np[i:i + self.filter_width, j - self.filter_width:j,
                              k - self.filter_width:k]
-            this_rho_south = self.rho_data_da[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
+            this_rho_south = self.rho_data_np[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
                              k - self.filter_width:k]
 
-            this_rho_up = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            this_rho_up = self.rho_data_np[i - self.filter_width:i, j - self.filter_width:j,
                           k:k + self.filter_width]
-            this_rho_down = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            this_rho_down = self.rho_data_np[i - self.filter_width:i, j - self.filter_width:j,
                             k - 2 * self.filter_width:k - self.filter_width]
 
             # get the neighbour c data
-            this_c_west = self.rho_c_data_da[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
+            this_c_west = self.rho_c_data_np[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
                           k - self.filter_width:k] / this_rho_west
-            this_c_east = self.rho_c_data_da[i - self.filter_width:i, j:j + self.filter_width,
+            this_c_east = self.rho_c_data_np[i - self.filter_width:i, j:j + self.filter_width,
                           k - self.filter_width:k] / this_rho_east
 
-            this_c_north = self.rho_c_data_da[i:i + self.filter_width, j - self.filter_width:j,
+            this_c_north = self.rho_c_data_np[i:i + self.filter_width, j - self.filter_width:j,
                            k - self.filter_width:k] / this_rho_north
-            this_c_south = self.rho_c_data_da[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
+            this_c_south = self.rho_c_data_np[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
                            k - self.filter_width:k] / this_rho_south
 
-            this_c_up = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            this_c_up = self.rho_c_data_np[i - self.filter_width:i, j - self.filter_width:j,
                         k:k + self.filter_width] / this_rho_up
-            this_c_down = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
+            this_c_down = self.rho_c_data_np[i - self.filter_width:i, j - self.filter_width:j,
                           k - 2 * self.filter_width:k - self.filter_width] / this_rho_down
 
             # now computing the gradients
@@ -735,16 +741,6 @@ class data_binning_PDF(object):
 
             this_magGrad_c = np.sqrt(this_grad_X ** 2 + this_grad_Y ** 2 + this_grad_Z ** 2)
 
-            # # print('i - 2*%f' % self.filter_width)
-            # print('this_c_north mean %f' % this_c_north.mean())
-            # print('this_c_south mean %f' % this_c_south.mean())
-            # print('this_c_west mean %f' % this_c_west.mean())
-            # print('this_c_east mean %f' % this_c_east.mean())
-            # print('this_c_down mean %f' % this_c_down.mean())
-            # print('this_c_up mean %f' % this_c_up.mean())
-            # print('this_grad_X', this_grad_X)
-            # print('this_grad_Y', this_grad_Y)
-            # print('this_grad_Z', this_grad_Z)
             print('A_LES: ', this_magGrad_c)
 
             # print("A_LES: ", this_magGrad)
