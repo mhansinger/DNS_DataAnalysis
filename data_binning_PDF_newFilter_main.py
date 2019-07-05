@@ -119,6 +119,9 @@ class data_binning_PDF(object):
         self.beta = beta
         self.m = m
 
+        # # will be overwritten with the correct value later !
+        # self.filter_width = 0
+
         # normalizing pressure
         self.p_0 = 1
 
@@ -133,7 +136,7 @@ class data_binning_PDF(object):
         self.wrinkling_factor=None
         self.RR_DNS = None              #Reaction rate computed from DNS Data
 
-        # FILTERING
+        # Variables for FILTERING
         self.c_filtered = np.zeros((self.Nx,self.Nx,self.Nx))
         self.rho_filtered = np.zeros((self.Nx,self.Nx,self.Nx))
 
@@ -142,6 +145,7 @@ class data_binning_PDF(object):
 
         # DELTA_LES: NORMALIZED FILTERWIDTH
         self.Delta_LES = None # --> is computed in self.run_analysis !
+        self.gauss_kernel = None
 
         #Data array to store the results
         self.dataArray_np = np.zeros(7)
@@ -180,6 +184,9 @@ class data_binning_PDF(object):
         self.rho_data_da = self.data_rho.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
         self.rho_c_data_da = self.data_rho_c.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
 
+        # progress variable
+        self.c_data_da =  self.rho_c_data_da / self.rho_data_da
+
     @jit
     def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
         # run the analysis without computation of wrinkling factor -> planar flame (dummy case)
@@ -212,9 +219,13 @@ class data_binning_PDF(object):
 
                         self.compute_cbar(this_rho_c_set,i,j,k,histogram)
 
-    # def apply_gauss_filter(self):
-    #     # filter c and rho data set
-    #    self.rho_filtered = sp.ndimage.filters.gaussian_filter(self.rho_data_da, sigma_xy, truncate=1.0, mode='reflect')
+    def apply_gauss_filter(self):
+        # filter c and rho data set with gauss filter function
+        print('Apply Gaussian filter...')
+        sigma_xy = [self.filter_width, self.filter_width ,self.filter_width]
+        self.rho_filtered = sp.ndimage.filters.gaussian_filter(self.rho_data_da, sigma_xy, truncate=1.0, mode='reflect')
+
+        self.c_filtered = sp.ndimage.filters.gaussian_filter(self.rho_c_data_da/self.rho_data_da, sigma_xy, truncate=1.0, mode='reflect')
 
 
     @jit
@@ -223,16 +234,21 @@ class data_binning_PDF(object):
         # interval is like nth point, skips some nodes
 
         self.write_csv = write_csv
-        self.filter_width = filter_width
+        self.filter_width = int(filter_width)
         #self.threshold = threshold
         self.interval = interval
-        #self.c_rho_max = c_rho_max
+
+        # filter the c and rho field
+        self.apply_gauss_filter()
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES= self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
         print('Delta_LES is: %.3f' % self.Delta_LES)
         flame_thickness = self.compute_flamethickness()
         print('Flame thickness: ',flame_thickness)
+
+        # Set the Gauss kernel
+        self.set_gaussian_kernel()
 
         # loop over the DNS Data
         count = 0
@@ -241,17 +257,9 @@ class data_binning_PDF(object):
                 for j in range(120,150): #range(self.filter_width - 1, self.Nx, self.interval):
                     for i in range(120,150):
 
-                        # this is the current data cube which constitutes the LES cell
-                        self.this_rho_c_set = self.rho_c_data_da[i - self.filter_width:i, j - self.filter_width:j,
-                                              k - self.filter_width:k]
-                        # get the density for the relevant points! it is stored in a different file!
-                        self.this_rho_set = self.rho_data_da[i - self.filter_width:i, j - self.filter_width:j,
-                                            k - self.filter_width:k]
-                        self.this_c_set = self.this_rho_c_set / self.this_rho_set
-
                         # c_bar is computed
-                        self.c_bar = self.this_c_set.mean()
-                        self.rho_bar = self.this_rho_set.mean()
+                        self.c_bar = self.c_filtered[i,j,k]
+                        self.rho_bar = self.rho_filtered[i,j,k]
 
                         # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
                         # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
@@ -337,66 +345,6 @@ class data_binning_PDF(object):
                      self.c_plus, self.c_minus])
                 self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
 
-
-    # REMOVE THIS FUNCTION?
-    @jit
-    def compute_cbar(self,data_set,i,j,k,histogram):
-        #compute c_bar without wrinkling factor
-
-        this_rho_c_reshape = data_set.reshape(self.filter_width**3)
-        this_rho_c_mean = this_rho_c_reshape.mean()
-
-        # get the density for the relevant points! it is stored in a different file!
-        this_rho_reshape = self.rho_data_da[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute().reshape(self.filter_width**3)
-        this_rho_mean = this_rho_reshape.mean()
-
-        # c without density
-        this_c_reshape = this_rho_c_reshape / this_rho_reshape
-
-        # c_bar is computed
-        this_c_bar = this_c_reshape.mean()
-
-        self.set_c_bar(this_c_bar)
-
-        # compute c_tilde: mean(rho*c)/mean(rho)
-        c_tilde = this_rho_c_mean / this_rho_mean
-
-        # compute the reaction rate of each cell     Eq (2.28) Senga documentation
-        # note that for Le=1: c=T, so this_c_reshape = this_T_reshape
-        exponent = - self.beta*(1-this_c_reshape) / (1 - self.alpha*(1 - this_c_reshape))
-        this_RR_reshape_DNS = self.bfact*this_rho_reshape*(1-this_c_reshape)*np.exp(exponent)
-
-        # another criteria
-        if this_c_bar < 0.99:
-            # construct empty data array and fill it
-            data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
-            data_arr[:, 0] = c_tilde
-            data_arr[:, 1] = this_rho_mean
-            data_arr[:, 2] = this_rho_c_reshape
-            data_arr[:, 3] = this_rho_reshape
-            data_arr[:, 4] = this_RR_reshape_DNS
-            #data_arr[:, 5] = int(i)
-            #data_arr[:, 6] = int(j)
-            #data_arr[:, 7] = int(k)
-            #
-            data_df = pd.DataFrame(data_arr, columns=self.col_names)
-            file_name = 'c_tilde_%.5f_filter_%i_%s.csv' % (c_tilde, self.filter_width, self.case)
-
-            #############################################
-            # computation of the integration boundaries
-            self.compute_c_minus(this_c_bar)
-            self.compute_c_plus(this_c_bar)
-            print('c_plus: ',self.c_plus)
-            #############################################
-
-            if self.write_csv:
-                data_df.to_csv(join(self.output_path, file_name), index=False)
-
-            if histogram:
-                #self.plot_histograms(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,this_rho_reshape=this_rho_reshape,
-                #                     c_bar = this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
-                self.plot_histograms_intervals(c_tilde=c_tilde,this_rho_c_reshape=this_rho_c_reshape,
-                                               this_rho_reshape=this_rho_reshape,c_bar=this_c_bar,this_RR_reshape_DNS=this_RR_reshape_DNS)
 
 
     def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,this_RR_reshape_DNS):
@@ -532,14 +480,28 @@ class data_binning_PDF(object):
         print(' ')
 
 
+    def set_gaussian_kernel(self):
+        size = int(self.filter_width)
+        vector = np.linspace(-self.filter_width,self.filter_width,2*self.filter_width+1)
+        x,y,z = np.meshgrid(vector, vector, vector)
+        x = x * self.delta_x
+        y = y * self.delta_x
+        z = z * self.delta_x
+
+        self.gauss_kernel = np.sqrt(12)/self.Delta_LES/np.sqrt(2*np.pi) * np.exp(-6*(x**2/self.Delta_LES**2 +y**2/self.Delta_LES**2 + z**2/self.Delta_LES**2 ))
+
+
     @jit
     def compute_wrinkling_RR(self,i,j,k,histogram):
         # this is to compute with the wrinkling factor and c_bar
 
-        this_rho_c_reshape = self.this_rho_c_set.reshape(self.filter_width**3)
+        #TODO
+        # this has to be re written for usage with the Gaussian filter!
+
+        #this_rho_c_reshape = self.this_rho_c_set.reshape(self.filter_width**3)
         this_rho_reshape = self.this_rho_set.reshape(self.filter_width**3)
 
-        this_rho_c_mean = this_rho_c_reshape.mean()
+        #this_rho_c_mean = this_rho_c_reshape.mean()
 
         this_rho_mean = this_rho_reshape.mean()
 
@@ -547,15 +509,12 @@ class data_binning_PDF(object):
         this_c_reshape = self.this_c_set.reshape(self.filter_width**3) #this_rho_c_reshape / this_rho_reshape
 
         # compute c_tilde: mean(rho*c)/mean(rho)
-        self.this_c_tilde = this_rho_c_mean / this_rho_mean
-
-        # c_bar is computed
-        #self.c_bar = this_c_reshape.mean()
+        #self.this_c_tilde = this_rho_c_mean / this_rho_mean
 
         this_rho_mean = this_rho_reshape.mean()
 
         # compute c_tilde: mean(rho*c)/mean(rho)
-        c_tilde = this_rho_c_mean / this_rho_mean
+        #c_tilde = this_rho_c_mean / this_rho_mean
 
         # compute the reaction rate of each cell     Eq (2.28) Senga documentation
         # note that for Le=1: c=T, so this_c_reshape = this_T_reshape
@@ -578,20 +537,6 @@ class data_binning_PDF(object):
             # consistency check, wrinkling factor needs to be >1!
             if self.wrinkling_factor >= 1:
                 self.data_flag=True
-                # construct empty data array and fill it
-                # data_arr = np.zeros((self.filter_width ** 3, len(self.col_names)))
-                # data_arr[:, 0] = c_tilde
-                # data_arr[:, 1] = this_rho_mean
-                # data_arr[:, 2] = this_rho_c_reshape
-                # data_arr[:, 3] = this_rho_reshape
-                # data_arr[:, 4] = this_RR_reshape_DNS
-                # data_arr[:, 5] = int(i)
-                # data_arr[:, 6] = int(j)
-                # data_arr[:, 7] = int(k)
-                #
-                # data_df = pd.DataFrame(data_arr, columns=self.col_names)
-                # file_name = 'c_bar_%.4f_wrinkl_%.3f_filter_%i_%s.csv' % (
-                # self.c_bar, self.wrinkling_factor, self.filter_width, self.case)
 
                 ###############################################
                 # Pfitzner's model
@@ -675,6 +620,68 @@ class data_binning_PDF(object):
         print("A_DNS: ", this_DNS_magGrad_c.sum() / (self.filter_width**3))
 
         return this_DNS_magGrad_c.sum() / (self.filter_width**3)
+
+    def compute_DNS_grad(self):
+        # computes the flame surface area in the DNS based on gradients of c of neighbour cells
+        width = 1
+
+        print('Computing DNS gradients...')
+
+        # create empty array
+        self.grad_c_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(1,self.Nx-1):
+            for m in range(1,self.Nx-1):
+                for n in range(1,self.Nx-1):
+                    this_DNS_gradX = (self.c_data_da[l+1, m, n] - self.c_data_da[l-1,m, n])/(2 * self.delta_x)
+                    this_DNS_gradY = (self.c_data_da[l, m+1, n] - self.c_data_da[l, m-1, n]) / (2 * self.delta_x)
+                    this_DNS_gradZ = (self.c_data_da[l, m, n+1]- self.c_data_da[l, m, n-1]) / (2 * self.delta_x)
+                    # compute the magnitude of the gradient
+                    this_DNS_magGrad_c = np.sqrt(this_DNS_gradX**2 + this_DNS_gradY**2 + this_DNS_gradZ**2)
+
+                    self.grad_c_DNS[l,m,n] = this_DNS_magGrad_c
+
+    def compute_LES_grad(self):
+        # computes the flame surface area in the DNS based on gradients of c of neighbour cells
+
+        print('Computing LES gradients on DNS mesh ...')
+
+        # create empty array
+        self.grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(1, self.Nx - 1):
+            for m in range(1, self.Nx - 1):
+                for n in range(1, self.Nx - 1):
+                    this_LES_gradX = (self.c_filtered[l + 1, m, n] - self.c_filtered[l - 1, m, n]) / (2 * self.delta_x)
+                    this_LES_gradY = (self.c_filtered[l, m + 1, n] - self.c_filtered[l, m - 1, n]) / (2 * self.delta_x)
+                    this_LES_gradZ = (self.c_filtered[l, m, n + 1] - self.c_filtered[l, m, n - 1]) / (2 * self.delta_x)
+                    # compute the magnitude of the gradient
+                    this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
+
+                    self.grad_c_LES[l, m, n] = this_LES_magGrad_c
+
+
+    def filter_DNS_grad(self):
+
+        #TODO
+        # do the Gauss filter thing from scipy again ...
+
+        # print('Filter DNS gradient ... ')
+        # # Fertig machen!
+        # # create empty array
+        # self.grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
+        #
+        # for l in range(1, self.Nx - 1):
+        #     for m in range(1, self.Nx - 1):
+        #         for n in range(1, self.Nx - 1):
+        #             this_LES_gradX = (self.c_filtered[l + 1, m, n] - self.c_filtered[l - 1, m, n]) / (2 * self.delta_x)
+        #             this_LES_gradY = (self.c_filtered[l, m + 1, n] - self.c_filtered[l, m - 1, n]) / (2 * self.delta_x)
+        #             this_LES_gradZ = (self.c_filtered[l, m, n + 1] - self.c_filtered[l, m, n - 1]) / (2 * self.delta_x)
+        #             # compute the magnitude of the gradient
+        #             this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
+
 
     @jit
     def get_A_LES(self,i,j,k):
