@@ -3,7 +3,7 @@ This is to read in the binary data File for the high pressure bunsen data
 
 @author: mhansinger
 
-last change: June 2019
+last change: July 2019
 '''
 
 import numpy as np
@@ -17,9 +17,10 @@ from numba import jit
 from mayavi import mlab
 # to free memory
 import gc
-from dask import delayed
+import dask
 import scipy as sp
 import scipy.ndimage
+import dask.array as da
 
 #TODO
 # anpassen des LES Gradienten!
@@ -223,6 +224,7 @@ class data_binning_PDF(object):
         # filter c and rho data set with gauss filter function
         print('Apply Gaussian filter...')
         sigma_xy = [self.filter_width, self.filter_width ,self.filter_width]
+
         self.rho_filtered = sp.ndimage.filters.gaussian_filter(self.rho_data_np, sigma_xy, truncate=1.0, mode='reflect')
 
         self.c_filtered = sp.ndimage.filters.gaussian_filter(self.rho_c_data_np/self.rho_data_np, sigma_xy, truncate=1.0, mode='reflect')
@@ -253,30 +255,35 @@ class data_binning_PDF(object):
         # loop over the DNS Data
         count = 0
         if self.case is 'planar_flame_test':
-            for k in range(self.filter_width - 1, self.Nx, self.interval):
-                for j in range(120,150): #range(self.filter_width - 1, self.Nx, self.interval):
-                    for i in range(120,150):
+            # for k in range(self.filter_width - 1, self.Nx, self.interval):
+            #     for j in range(120,150): #range(self.filter_width - 1, self.Nx, self.interval):
+            #         for i in range(120,150):
+            #
+            #             # c_bar is computed
+            #             self.c_bar = self.c_filtered[i,j,k]
+            #             self.rho_bar = self.rho_filtered[i,j,k]
+            #
+            #             # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
+            #             # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
+            #             if c_min_thresh < self.c_bar <= c_max_thresh:  # and self.c_bar_old != self.c_bar:
+            #
+            #                 self.compute_wrinkling_RR(i, j, k, histogram)
+            #
+            #                 if self.data_flag:
+            #                     # update the data array for output
+            #                     this_data_vec = np.array([self.c_bar, self.wrinkling_factor, np.mean(self.RR_DNS),
+            #                                               np.mean(self.RR_DNS_Pfitz), self.omega_bar_model, self.c_plus,
+            #                                               self.c_minus])
+            #                     # append the data
+            #                     self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
+            #
+            #             # obj = delayed(self.compute_loop_analysis)(i, j, k, c_min_thresh, c_max_thresh, histogram)
+            #             # obj.compute()
 
-                        # c_bar is computed
-                        self.c_bar = self.c_filtered[i,j,k]
-                        self.rho_bar = self.rho_filtered[i,j,k]
+            # compute the wrinkling factor
+            self.get_wrinkling()
+            self.compute_Pfitzner_model()
 
-                        # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
-                        # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
-                        if c_min_thresh < self.c_bar <= c_max_thresh:  # and self.c_bar_old != self.c_bar:
-
-                            self.compute_wrinkling_RR(i, j, k, histogram)
-
-                            if self.data_flag:
-                                # update the data array for output
-                                this_data_vec = np.array([self.c_bar, self.wrinkling_factor, np.mean(self.RR_DNS),
-                                                          np.mean(self.RR_DNS_Pfitz), self.omega_bar_model, self.c_plus,
-                                                          self.c_minus])
-                                # append the data
-                                self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
-
-                        # obj = delayed(self.compute_loop_analysis)(i, j, k, c_min_thresh, c_max_thresh, histogram)
-                        # obj.compute()
 
         else:
             for k in range(self.filter_width - 1, self.Nx, self.interval):
@@ -312,11 +319,25 @@ class data_binning_PDF(object):
                         obj = delayed(self.compute_loop_analysis)(i, j, k, c_min_thresh, c_max_thresh, histogram)
                         obj.compute()
 
+        dataArray_da = da.vstack([self.c_filtered.reshape(self.Nx**3),
+                                   self.wrinkling_factor.reshape(self.Nx**3),
+                                   self.omega_model_cbar.reshape(self.Nx**3),
+                                   self.omega_DNS_filtered.reshape(self.Nx**3),
+                                   self.c_plus.reshape(self.Nx**3),
+                                   self.c_minus.reshape(self.Nx**3)])
+
         # write data to csv file
         filename = join(self.case,'filter_width_'+str(self.filter_width)+'.csv')
-        dataArray_pd = pd.DataFrame(data=self.dataArray_np,columns=['c_bar','wrinkling','omega_DNS_Klein','omega_DNS_Pfitzner','omega_model','c_plus','c_minus'])
-        dataArray_pd.to_csv(filename,index=False)
-        print('Data has been written.')
+        dataArray_dd = dd.DataFrame(data=self.dataArray_da,
+                                    columns=['c_bar','wrinkling','omega_model','omega_DNS_filtered','c_plus','c_minus'])
+
+        # filter the data set and remove unecessary entries
+        dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
+        dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.99]
+
+        # print('Writing output to csv ...')
+        # dataArray_dd.to_csv(filename,index=False)
+        # print('Data has been written.')
 
 
     def compute_loop_analysis(self, i, j, k, c_min_thresh, c_max_thresh, histogram):
@@ -344,7 +365,6 @@ class data_binning_PDF(object):
                     [self.c_bar, self.wrinkling_factor, self.RR_DNS, self.RR_DNS_Pfitz, self.omega_bar_model,
                      self.c_plus, self.c_minus])
                 self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
-
 
 
     def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,this_RR_reshape_DNS):
@@ -573,55 +593,19 @@ class data_binning_PDF(object):
                 print("##################\n")
                 self.data_flag=False
 
-    @jit
-    def get_wrinkling(self,i,j,k):
+
+    def get_wrinkling(self):
         # computes the wriknling factor from resolved and filtered flame surface
         #print(i)
-        this_A_LES = self.get_A_LES(i,j,k)
 
-        this_A_DNS = self.get_A_DNS(i,j,k)
+        grad_DNS_filtered = self.copmute_filter_DNS_grad()
+        grad_LES = self.compute_LES_grad()
 
-        print("Wrinkling factor: ", this_A_DNS/this_A_LES)
-        print(" ")
+        #compute the wrinkling factor
+        print('Computing wrinkling factor ...')
+        self.wrinkling_factor = grad_DNS_filtered / grad_LES
 
-        return this_A_DNS/this_A_LES
-
-    @jit
-    def get_A_DNS(self,i,j,k):
-        # computes the flame surface area in the DNS based on gradients of c of neighbour cells
-        width = 1
-
-        this_DNS_gradX = np.zeros((self.filter_width,self.filter_width,self.filter_width))
-        this_DNS_gradY = this_DNS_gradX.copy()
-        this_DNS_gradZ = this_DNS_gradX.copy()
-        this_DNS_magGrad_c = this_DNS_gradX.copy()
-
-        this_rho_c_data = self.rho_c_data_np[i -(self.filter_width+1):(i + 1), (j - 1) - self.filter_width:(j + 1),
-                      k - (self.filter_width+1):(k + 1)]
-
-        this_rho_data = self.rho_data_np[(i - 1) - self.filter_width:(i + 1), (j - 1) - self.filter_width:(j + 1),
-                      k - (self.filter_width+1):(k + 1)]
-
-        #print("this rho_c_data.max(): ", (this_rho_c_data/this_rho_data))
-
-        for l in range(self.filter_width):
-            for m in range(self.filter_width):
-                for n in range(self.filter_width):
-                    this_DNS_gradX[l, m, n] = (this_rho_c_data[l+1, m, n]/this_rho_data[l+1, m, n] - this_rho_c_data[l-1,m, n]/this_rho_data[l-1,m, n])/(2 * width)
-                    this_DNS_gradY[l, m, n] = (this_rho_c_data[l, m+1, n]/this_rho_data[l, m+1, n] - this_rho_c_data[l, m-1, n]/this_rho_data[l, m-1, n]) / (2 * width)
-                    this_DNS_gradZ[l, m, n] = (this_rho_c_data[l, m, n+1]/this_rho_data[l, m, n+1] - this_rho_c_data[l, m, n-1]/this_rho_data[l, m, n-1]) / (2 * width)
-                    # compute the magnitude of the gradient
-                    this_DNS_magGrad_c[l,m,n] = np.sqrt(this_DNS_gradX[l,m,n]**2 + this_DNS_gradY[l,m,n]**2 + this_DNS_gradZ[l,m,n]**2)
-
-        # return the resolved iso surface area
-        print("this_DNS_magGrad.sum(): ", this_DNS_magGrad_c.sum())
-        print("max thisDNS_grad_X: ", this_DNS_gradX.max())
-        print("max thisDNS_grad_Y: ", this_DNS_gradY.max())
-        print("max thisDNS_grad_Z: ", this_DNS_gradZ.max())
-        print("A_DNS: ", this_DNS_magGrad_c.sum() / (self.filter_width**3))
-
-        return this_DNS_magGrad_c.sum() / (self.filter_width**3)
-
+    #@dask.delayed
     def compute_DNS_grad(self):
         # computes the flame surface area in the DNS based on gradients of c of neighbour cells
         width = 1
@@ -629,7 +613,7 @@ class data_binning_PDF(object):
         print('Computing DNS gradients...')
 
         # create empty array
-        self.grad_c_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+        grad_c_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
 
         # compute gradients from the boundaries away ...
         for l in range(1,self.Nx-1):
@@ -641,15 +625,18 @@ class data_binning_PDF(object):
                     # compute the magnitude of the gradient
                     this_DNS_magGrad_c = np.sqrt(this_DNS_gradX**2 + this_DNS_gradY**2 + this_DNS_gradZ**2)
 
-                    self.grad_c_DNS[l,m,n] = this_DNS_magGrad_c
+                    grad_c_DNS[l,m,n] = this_DNS_magGrad_c
 
+        return grad_c_DNS
+
+    #@dask.delayed
     def compute_LES_grad(self):
         # computes the flame surface area in the DNS based on gradients of c of neighbour cells
 
         print('Computing LES gradients on DNS mesh ...')
 
         # create empty array
-        self.grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+        grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
 
         # compute gradients from the boundaries away ...
         for l in range(1, self.Nx - 1):
@@ -661,17 +648,25 @@ class data_binning_PDF(object):
                     # compute the magnitude of the gradient
                     this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
 
-                    self.grad_c_LES[l, m, n] = this_LES_magGrad_c
+                    grad_c_LES[l, m, n] = this_LES_magGrad_c
 
+        return grad_c_LES
 
-    def filter_DNS_grad(self):
+    #@dask.delayed
+    def copmute_filter_DNS_grad(self):
     # compute filtered DNS reaction rate
         # create empty array
-        self.grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
+        grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
+
+        # compute dask delayed object
+        grad_c_DNS = self.compute_DNS_grad()
 
         sigma_xy = [self.filter_width, self.filter_width ,self.filter_width]
-        self.grad_DNS_filtered = sp.ndimage.filters.gaussian_filter(self.grad_c_DNS, sigma_xy, truncate=1.0, mode='reflect')
-        
+        grad_DNS_filtered = sp.ndimage.filters.gaussian_filter(grad_c_DNS, sigma_xy, truncate=1.0, mode='reflect')
+
+        return grad_DNS_filtered
+
+    #@dask.delayed
     def compute_RR_DNS(self):
         # according to Pfitzner implementation
         exponent = - self.beta*(1-self.c_data_np.reshape(self.Nx**3)) / (1 - self.alpha*(1 - self.c_data_np.reshape(self.Nx**3)))
@@ -680,82 +675,40 @@ class data_binning_PDF(object):
         this_RR_reshape_DNS_Pfitz  = 18.97 * ((1 - self.alpha * (1 - self.c_data_np.reshape(self.Nx**3)))) ** (-1) \
                                      * (1 - self.c_data_np.reshape(self.Nx**3)) * np.exp(exponent)
 
-        self.RR_DNS = this_RR_reshape_DNS_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
+        RR_DNS = this_RR_reshape_DNS_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
 
-        del exponent
-        del this_RR_reshape_DNS_Pfitz
+        return RR_DNS
 
-    #TODO
-    # Fehlt noch das selbe mit LES RR
+    #@dask.delayed
+    def filter_RR_DNS(self):
+    # compute filtered DNS reaction rate
+        # create empty array
+
+        RR_DNS = self.compute_RR_DNS()
+
+        sigma_xy = [self.filter_width, self.filter_width ,self.filter_width]
+        RR_DNS_filtered = sp.ndimage.filters.gaussian_filter(RR_DNS, sigma_xy, truncate=1.0, mode='reflect')
+
+        return RR_DNS_filtered
 
 
+    #@dask.delayed
+    def compute_RR_LES(self):
+        # according to Pfitzner implementation
+        exponent = - self.beta*(1-self.c_filtered.reshape(self.Nx**3)) / (1 - self.alpha*(1 - self.c_filtered.reshape(self.Nx**3)))
+        #this_RR_reshape_DNS = self.bfact*self.rho_data_np.reshape(self.Nx**3)*(1-self.c_data_np.reshape(self.Nx**3))*np.exp(exponent)
 
-    @jit
-    def get_A_LES(self,i,j,k):
-        # computes the filtered iso surface area
+        this_RR_reshape_LES_Pfitz  = 18.97 * ((1 - self.alpha * (1 - self.c_data_np.reshape(self.Nx**3)))) ** (-1) \
+                                     * (1 - self.c_data_np.reshape(self.Nx**3)) * np.exp(exponent)
 
-        if i - self.filter_width < 0 or j - self.filter_width < 0 or k - self.filter_width < 0:
-            print("too small!")
-            return 1000
+        RR_LES = this_RR_reshape_LES_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
 
-        elif i + self.filter_width > self.Nx or j + self.filter_width > self.Nx or k + self.filter_width > self.Nx:
-            print("too big!")
-            return 1000
-
-        else:
-            # get the neighbour rho data
-            this_rho_west = self.rho_data_np[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
-                            k - self.filter_width:k]
-            this_rho_east = self.rho_data_np[i - self.filter_width:i, j:j + self.filter_width,
-                            k - self.filter_width:k]
-
-            this_rho_north = self.rho_data_np[i:i + self.filter_width, j - self.filter_width:j,
-                             k - self.filter_width:k]
-            this_rho_south = self.rho_data_np[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
-                             k - self.filter_width:k]
-
-            this_rho_up = self.rho_data_np[i - self.filter_width:i, j - self.filter_width:j,
-                          k:k + self.filter_width]
-            this_rho_down = self.rho_data_np[i - self.filter_width:i, j - self.filter_width:j,
-                            k - 2 * self.filter_width:k - self.filter_width]
-
-            # get the neighbour c data
-            this_c_west = self.rho_c_data_np[i - self.filter_width:i, j - 2 * self.filter_width:j - self.filter_width,
-                          k - self.filter_width:k] / this_rho_west
-            this_c_east = self.rho_c_data_np[i - self.filter_width:i, j:j + self.filter_width,
-                          k - self.filter_width:k] / this_rho_east
-
-            this_c_north = self.rho_c_data_np[i:i + self.filter_width, j - self.filter_width:j,
-                           k - self.filter_width:k] / this_rho_north
-            this_c_south = self.rho_c_data_np[i - 2 * self.filter_width:i - self.filter_width, j - self.filter_width:j,
-                           k - self.filter_width:k] / this_rho_south
-
-            this_c_up = self.rho_c_data_np[i - self.filter_width:i, j - self.filter_width:j,
-                        k:k + self.filter_width] / this_rho_up
-            this_c_down = self.rho_c_data_np[i - self.filter_width:i, j - self.filter_width:j,
-                          k - 2 * self.filter_width:k - self.filter_width] / this_rho_down
-
-            # now computing the gradients
-            this_grad_X = (this_c_north.mean() - this_c_south.mean()) / (2 * self.filter_width)
-            this_grad_Y = (this_c_east.mean() - this_c_west.mean()) / (2 * self.filter_width)
-            this_grad_Z = (this_c_down.mean() - this_c_up.mean()) / (2 * self.filter_width)
-
-            this_magGrad_c = np.sqrt(this_grad_X ** 2 + this_grad_Y ** 2 + this_grad_Z ** 2)
-
-            print('A_LES: ', this_magGrad_c)
-
-            # print("A_LES: ", this_magGrad)
-            return this_magGrad_c
+        return RR_LES
 
 
 
     # added Nov. 2018: Implementation of Pfitzner's analytical boundaries
     # getter and setter for c_Mean as a protected
-    def set_c_bar(self,c_bar):
-        self.c_bar = c_bar
-
-    def get_c_bar(self):
-        return self.c_bar
 
     def compute_flamethickness(self):
         '''
@@ -799,10 +752,11 @@ class data_binning_PDF(object):
     # compute the values for c_minus
     def compute_c_minus(self):
         # Eq. 40
-        this_s = self.compute_s(self.c_bar)
+        this_s = self.compute_s(self.c_filtered.reshape(self.Nx**3))
         this_delta_0 = self.compute_delta_0(this_s)
 
-        self.c_minus = (np.exp(self.c_bar * this_delta_0 * self.Delta_LES) - 1) / (np.exp(this_delta_0 * self.Delta_LES) - 1)
+        self.c_minus = (np.exp(self.c_filtered.reshape(self.Nx**3)* this_delta_0 * self.Delta_LES) - 1) / \
+                       (np.exp(this_delta_0 * self.Delta_LES) - 1)
 
 
     def compute_c_plus(self):
@@ -824,7 +778,7 @@ class data_binning_PDF(object):
         :return: omega Eq. 29
         '''
 
-        self.omega_bar_model = (self.c_plus ** (self.m + 1) - self.c_minus ** (self.m + 1)) / self.Delta_LES
+        return (self.c_plus ** (self.m + 1) - self.c_minus ** (self.m + 1)) / self.Delta_LES
 
 
     def model_omega(self,c):
@@ -851,10 +805,10 @@ class data_binning_PDF(object):
 
         #print('Lambda:', Eigenval)
 
-        om_Klein = self.bfact*self.rho_bar*(1-c)*np.exp(exponent)
+        # om_Klein = self.bfact*self.rho_bar*(1-c)*np.exp(exponent)
         om_Pfitzner = Eigenval * ((1 - self.alpha * (1 - c))) ** (-1) * (1 - c) * np.exp(exponent)
 
-        return om_Klein, om_Pfitzner
+        return om_Pfitzner
 
 
     def compute_Pfitzner_model(self):
@@ -862,26 +816,21 @@ class data_binning_PDF(object):
         computes the model values in sequential manner
         '''
 
-        print('c_bar is: ',self.c_bar)
         self.compute_c_minus()
-        print('c_minus is: ',self.c_minus)
+        #print('c_minus is: ',self.c_minus)
 
         self.compute_c_plus()
-        print('c_plus is: ', self.c_plus)
+        #print('c_plus is: ', self.c_plus)
 
-        self.compute_model_omega_bar()
+        self.omega_model_cbar = self.compute_model_omega_bar()
 
-        this_omega_model_cbar = self.model_omega(self.c_bar)
-        omega_Klein, omega_Pfitzner = self.analytical_omega(self.c_bar)
+        #self.omega_model_cbar = self.model_omega(self.c_filtered.reshape(self.Nx**3))
+        omega_DNS_unfiltered = self.analytical_omega(self.c_data_np.reshape(self.Nx**3)).reshape(self.Nx,self.Nx,self.Nx)
 
-        print('omega_bar_model is: ', self.omega_bar_model)
-        print('omega_bar_DNS is: ', np.mean(self.RR_DNS))
-        print('omega_bar_DNS_Pfitz is: ', np.mean(self.RR_DNS_Pfitz))
-        print('Delta_LES is: ',self.Delta_LES)
-        print('omega_model(c_bar): ', this_omega_model_cbar)
-        print('omega_analytical_Klein(c_bar): ', omega_Klein)
-        print('omega_analytical_Pfitzner(c_bar): ', omega_Pfitzner)
-        print('###########################\n')
+        # filter the DNS reaction rate
+        self.omega_DNS_filtered = sp.ndimage.filters.gaussian_filter(omega_DNS_unfiltered, [self.Nx, self.Nx, self.Nx], truncate=1.0, mode='reflect')
+
+
 
 
 
