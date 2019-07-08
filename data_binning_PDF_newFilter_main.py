@@ -328,8 +328,8 @@ class data_binning_PDF(object):
 
         # write data to csv file
         filename = join(self.case,'filter_width_'+str(self.filter_width)+'.csv')
-        dataArray_dd = dd.DataFrame(data=self.dataArray_da,
-                                    columns=['c_bar','wrinkling','omega_model','omega_DNS_filtered','c_plus','c_minus'])
+        dataArray_dd = dd.DataFrame(dataArray_da,
+                                    ['c_bar','wrinkling','omega_model','omega_DNS_filtered','c_plus','c_minus'])
 
         # filter the data set and remove unecessary entries
         dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
@@ -598,7 +598,7 @@ class data_binning_PDF(object):
         # computes the wriknling factor from resolved and filtered flame surface
         #print(i)
 
-        grad_DNS_filtered = self.copmute_filter_DNS_grad()
+        grad_DNS_filtered = self.compute_filter_DNS_grad()
         grad_LES = self.compute_LES_grad()
 
         #compute the wrinkling factor
@@ -652,8 +652,30 @@ class data_binning_PDF(object):
 
         return grad_c_LES
 
+    def compute_LES_grad_2(self):
+        # computes the flame surface area in the DNS based on gradients of c of neighbour cells
+
+        print('Computing LES gradients on LES mesh ...')
+
+        # create empty array
+        grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(1, self.Nx - 1):
+            for m in range(1, self.Nx - 1):
+                for n in range(1, self.Nx - 1):
+                    this_LES_gradX = (self.c_filtered[l + self.filter_width, m, n] - self.c_filtered[l - self.filter_width, m, n]) / (2 * self.Delta_LES)
+                    this_LES_gradY = (self.c_filtered[l, m + self.filter_width, n] - self.c_filtered[l, m - self.filter_width, n]) / (2 * self.Delta_LES)
+                    this_LES_gradZ = (self.c_filtered[l, m, n + self.filter_width] - self.c_filtered[l, m, n - self.filter_width]) / (2 * self.Delta_LES)
+                    # compute the magnitude of the gradient
+                    this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
+
+                    grad_c_LES[l, m, n] = this_LES_magGrad_c
+
+        return grad_c_LES
+
     #@dask.delayed
-    def copmute_filter_DNS_grad(self):
+    def compute_filter_DNS_grad(self):
     # compute filtered DNS reaction rate
         # create empty array
         grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
