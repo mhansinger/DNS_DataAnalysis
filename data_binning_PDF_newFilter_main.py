@@ -22,9 +22,7 @@ import scipy as sp
 import scipy.ndimage
 import dask.array as da
 
-#TODO
-# anpassen des LES Gradienten!
-# implement Gauss filter?
+
 
 class data_binning_PDF(object):
 
@@ -188,37 +186,37 @@ class data_binning_PDF(object):
         # progress variable
         self.c_data_np=  self.rho_c_data_np / self.rho_data_np
 
-    @jit
-    def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
-        # run the analysis without computation of wrinkling factor -> planar flame (dummy case)
-
-        self.filter_width =filter_width
-        self.threshold = threshold
-        self.interval = interval
-        self.c_rho_max = c_rho_max
-
-        # Compute the scaled Delta (Pfitzner PDF)
-        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
-
-        count = 0
-        for k in range(self.filter_width-1,self.Nx,self.interval):
-            for j in range(self.filter_width - 1, self.Nx, self.interval):
-                for i in range(self.filter_width - 1, self.Nx, self.interval):
-
-                    # TEST VERSION
-                    # this is the current data cube which constitutes the LES cell
-                    this_rho_c_set = self.rho_c_data_np[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
-
-                    #print(this_rho_c_set)
-
-                    # check if threshold condition is reached
-                    # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
-                    if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
-
-                        #print('If criteria erreicht!')
-                        #compute c-bar
-
-                        self.compute_cbar(this_rho_c_set,i,j,k,histogram)
+    # @jit
+    # def run_analysis(self,filter_width = 8, interval = 2, threshold=0.005, c_rho_max = 0.1818, histogram=True):
+    #     # run the analysis without computation of wrinkling factor -> planar flame (dummy case)
+    #
+    #     self.filter_width =filter_width
+    #     self.threshold = threshold
+    #     self.interval = interval
+    #     self.c_rho_max = c_rho_max
+    #
+    #     # Compute the scaled Delta (Pfitzner PDF)
+    #     self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+    #
+    #     count = 0
+    #     for k in range(self.filter_width-1,self.Nx,self.interval):
+    #         for j in range(self.filter_width - 1, self.Nx, self.interval):
+    #             for i in range(self.filter_width - 1, self.Nx, self.interval):
+    #
+    #                 # TEST VERSION
+    #                 # this is the current data cube which constitutes the LES cell
+    #                 this_rho_c_set = self.rho_c_data_np[i-self.filter_width:i ,j-self.filter_width:j, k-self.filter_width:k].compute()
+    #
+    #                 #print(this_rho_c_set)
+    #
+    #                 # check if threshold condition is reached
+    #                 # -> avoid computations where c_bar is either 0 or 1 as there is no flame front
+    #                 if (this_rho_c_set > self.threshold).any() and (this_rho_c_set < self.c_rho_max).all():
+    #
+    #                     #print('If criteria erreicht!')
+    #                     #compute c-bar
+    #
+    #                     self.compute_cbar(this_rho_c_set,i,j,k,histogram)
 
     def apply_gauss_filter(self):
         # filter c and rho data set with gauss filter function
@@ -231,14 +229,12 @@ class data_binning_PDF(object):
 
 
     @jit
-    def run_analysis_wrinkling(self,filter_width = 8, interval = 2, c_min_thresh=0.01, c_max_thresh = 0.99, histogram=False, write_csv=False):
+    def run_analysis_wrinkling(self,filter_width = 8,histogram=False, write_csv=False):
         # run the analysis and compute the wrinkling factor -> real 3D cases
         # interval is like nth point, skips some nodes
 
         self.write_csv = write_csv
         self.filter_width = int(filter_width)
-        #self.threshold = threshold
-        self.interval = interval
 
         # filter the c and rho field
         self.apply_gauss_filter()
@@ -253,91 +249,74 @@ class data_binning_PDF(object):
         self.set_gaussian_kernel()
 
         # loop over the DNS Data
-        count = 0
-        if self.case is 'planar_flame_test':
-            # for k in range(self.filter_width - 1, self.Nx, self.interval):
-            #     for j in range(120,150): #range(self.filter_width - 1, self.Nx, self.interval):
-            #         for i in range(120,150):
-            #
-            #             # c_bar is computed
-            #             self.c_bar = self.c_filtered[i,j,k]
-            #             self.rho_bar = self.rho_filtered[i,j,k]
-            #
-            #             # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
-            #             # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
-            #             if c_min_thresh < self.c_bar <= c_max_thresh:  # and self.c_bar_old != self.c_bar:
-            #
-            #                 self.compute_wrinkling_RR(i, j, k, histogram)
-            #
-            #                 if self.data_flag:
-            #                     # update the data array for output
-            #                     this_data_vec = np.array([self.c_bar, self.wrinkling_factor, np.mean(self.RR_DNS),
-            #                                               np.mean(self.RR_DNS_Pfitz), self.omega_bar_model, self.c_plus,
-            #                                               self.c_minus])
-            #                     # append the data
-            #                     self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
-            #
-            #             # obj = delayed(self.compute_loop_analysis)(i, j, k, c_min_thresh, c_max_thresh, histogram)
-            #             # obj.compute()
+        #count = 0
+        #if self.case is 'planar_flame_test':
 
-            # compute the wrinkling factor
-            self.get_wrinkling()
-            self.compute_Pfitzner_model()
+        # compute the wrinkling factor
+        self.get_wrinkling()
+        self.compute_Pfitzner_model()
 
 
-        else:
-            for k in range(self.filter_width - 1, self.Nx, self.interval):
-                for j in range(self.filter_width - 1, self.Nx, self.interval):
-                    for i in range(self.filter_width - 1, self.Nx, self.interval):
+        # else:
+        #     for k in range(self.filter_width - 1, self.Nx, self.interval):
+        #         for j in range(self.filter_width - 1, self.Nx, self.interval):
+        #             for i in range(self.filter_width - 1, self.Nx, self.interval):
+        #
+        #                 # # this is the current data cube which constitutes the LES cell
+        #                 # self.this_rho_c_set = self.rho_c_data_np[i - self.filter_width:i, j - self.filter_width:j,
+        #                 #                       k - self.filter_width:k]
+        #                 # # get the density for the relevant points! it is stored in a different file!
+        #                 # self.this_rho_set = self.rho_data_np[i - self.filter_width:i, j - self.filter_width:j,
+        #                 #                     k - self.filter_width:k]
+        #                 # self.this_c_set = self.this_rho_c_set / self.this_rho_set
+        #                 #
+        #                 # # c_bar is computed
+        #                 # self.c_bar = self.this_c_set.mean()
+        #                 # self.rho_bar = self.this_rho_set.mean()
+        #                 #
+        #                 # # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
+        #                 # # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
+        #                 # if c_min_thresh < self.c_bar <= c_max_thresh:  # and self.c_bar_old != self.c_bar:
+        #                 #
+        #                 #     self.compute_wrinkling_RR(i, j, k, histogram)
+        #                 #
+        #                 #     if self.data_flag:
+        #                 #         # update the data array for output
+        #                 #         this_data_vec = np.array([self.c_bar, self.wrinkling_factor, np.mean(self.RR_DNS),
+        #                 #                                   np.mean(self.RR_DNS_Pfitz), self.omega_bar_model, self.c_plus,
+        #                 #                                   self.c_minus])
+        #                 #         # append the data
+        #                 #         self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
+        #
+        #                 obj = delayed(self.compute_loop_analysis)(i, j, k, c_min_thresh, c_max_thresh, histogram)
+        #                 obj.compute()
 
-                        # # this is the current data cube which constitutes the LES cell
-                        # self.this_rho_c_set = self.rho_c_data_np[i - self.filter_width:i, j - self.filter_width:j,
-                        #                       k - self.filter_width:k]
-                        # # get the density for the relevant points! it is stored in a different file!
-                        # self.this_rho_set = self.rho_data_np[i - self.filter_width:i, j - self.filter_width:j,
-                        #                     k - self.filter_width:k]
-                        # self.this_c_set = self.this_rho_c_set / self.this_rho_set
-                        #
-                        # # c_bar is computed
-                        # self.c_bar = self.this_c_set.mean()
-                        # self.rho_bar = self.this_rho_set.mean()
-                        #
-                        # # CRITERIA BASED ON C_BAR IF DATA IS FURTHER ANALYSED
-                        # # (CONSIDER DATA WHERE THE FLAME IS, THROW AWAY EVERYTHING ELSE)
-                        # if c_min_thresh < self.c_bar <= c_max_thresh:  # and self.c_bar_old != self.c_bar:
-                        #
-                        #     self.compute_wrinkling_RR(i, j, k, histogram)
-                        #
-                        #     if self.data_flag:
-                        #         # update the data array for output
-                        #         this_data_vec = np.array([self.c_bar, self.wrinkling_factor, np.mean(self.RR_DNS),
-                        #                                   np.mean(self.RR_DNS_Pfitz), self.omega_bar_model, self.c_plus,
-                        #                                   self.c_minus])
-                        #         # append the data
-                        #         self.dataArray_np = np.vstack([self.dataArray_np, this_data_vec])
-
-                        obj = delayed(self.compute_loop_analysis)(i, j, k, c_min_thresh, c_max_thresh, histogram)
-                        obj.compute()
-
-        dataArray_da = da.vstack([self.c_filtered.reshape(self.Nx**3),
-                                   self.wrinkling_factor.reshape(self.Nx**3),
-                                   self.omega_model_cbar.reshape(self.Nx**3),
-                                   self.omega_DNS_filtered.reshape(self.Nx**3),
-                                   self.c_plus.reshape(self.Nx**3),
-                                   self.c_minus.reshape(self.Nx**3)])
+        # creat dask array and reshape all data
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
+                                   self.wrinkling_factor.reshape(self.Nx**3,1),
+                                   self.wrinkling_factor_LES.reshape(self.Nx ** 3,1),
+                                   self.omega_model_cbar.reshape(self.Nx**3,1),
+                                   self.omega_DNS_filtered.reshape(self.Nx**3,1),
+                                   self.c_plus.reshape(self.Nx**3,1),
+                                   self.c_minus.reshape(self.Nx**3,1)])
 
         # write data to csv file
         filename = join(self.case,'filter_width_'+str(self.filter_width)+'.csv')
-        dataArray_dd = dd.DataFrame(dataArray_da,
-                                    ['c_bar','wrinkling','omega_model','omega_DNS_filtered','c_plus','c_minus'])
+        self.dataArray_dd = dd.io.from_dask_array(dataArray_da,
+                                             columns=['c_bar','wrinkling','wrinkling_LES','omega_model','omega_DNS_filtered','c_plus','c_minus'])
 
         # filter the data set and remove unecessary entries
-        dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
-        dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.99]
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.001]
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
 
-        # print('Writing output to csv ...')
-        # dataArray_dd.to_csv(filename,index=False)
-        # print('Data has been written.')
+        if self.case is 'planar_flame_test':
+            self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] < 1.1]
+
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
+
+        print('Writing output to csv ...')
+        self.dataArray_dd.compute().to_csv(filename,index=False)
+        print('Data has been written.')
 
 
     def compute_loop_analysis(self, i, j, k, c_min_thresh, c_max_thresh, histogram):
@@ -601,9 +580,13 @@ class data_binning_PDF(object):
         grad_DNS_filtered = self.compute_filter_DNS_grad()
         grad_LES = self.compute_LES_grad()
 
+        # wrinkling factor on LES mesh
+        grad_LES_2 = self.compute_LES_grad_2()
+
         #compute the wrinkling factor
         print('Computing wrinkling factor ...')
         self.wrinkling_factor = grad_DNS_filtered / grad_LES
+        self.wrinkling_factor_LES = grad_DNS_filtered / grad_LES_2
 
     #@dask.delayed
     def compute_DNS_grad(self):
@@ -661,9 +644,9 @@ class data_binning_PDF(object):
         grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
 
         # compute gradients from the boundaries away ...
-        for l in range(1, self.Nx - 1):
-            for m in range(1, self.Nx - 1):
-                for n in range(1, self.Nx - 1):
+        for l in range(self.filter_width, self.Nx - self.filter_width):
+            for m in range(self.filter_width, self.Nx - self.filter_width):
+                for n in range(self.filter_width, self.Nx - self.filter_width):
                     this_LES_gradX = (self.c_filtered[l + self.filter_width, m, n] - self.c_filtered[l - self.filter_width, m, n]) / (2 * self.Delta_LES)
                     this_LES_gradY = (self.c_filtered[l, m + self.filter_width, n] - self.c_filtered[l, m - self.filter_width, n]) / (2 * self.Delta_LES)
                     this_LES_gradZ = (self.c_filtered[l, m, n + self.filter_width] - self.c_filtered[l, m, n - self.filter_width]) / (2 * self.Delta_LES)
@@ -673,6 +656,7 @@ class data_binning_PDF(object):
                     grad_c_LES[l, m, n] = this_LES_magGrad_c
 
         return grad_c_LES
+
 
     #@dask.delayed
     def compute_filter_DNS_grad(self):
@@ -690,12 +674,15 @@ class data_binning_PDF(object):
 
     #@dask.delayed
     def compute_RR_DNS(self):
+
+        c_data_np_vector = self.c_data_np.reshape(self.Nx**3)
+
         # according to Pfitzner implementation
-        exponent = - self.beta*(1-self.c_data_np.reshape(self.Nx**3)) / (1 - self.alpha*(1 - self.c_data_np.reshape(self.Nx**3)))
+        exponent = - self.beta*(1 - c_data_np_vector) / (1 - self.alpha*(1 - c_data_np_vector))
         #this_RR_reshape_DNS = self.bfact*self.rho_data_np.reshape(self.Nx**3)*(1-self.c_data_np.reshape(self.Nx**3))*np.exp(exponent)
 
-        this_RR_reshape_DNS_Pfitz  = 18.97 * ((1 - self.alpha * (1 - self.c_data_np.reshape(self.Nx**3)))) ** (-1) \
-                                     * (1 - self.c_data_np.reshape(self.Nx**3)) * np.exp(exponent)
+        this_RR_reshape_DNS_Pfitz  = 18.97 * ((1 - self.alpha * (1 - c_data_np_vector))) ** (-1) \
+                                     * (1 - c_data_np_vector) * np.exp(exponent)
 
         RR_DNS = this_RR_reshape_DNS_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
 
@@ -799,6 +786,7 @@ class data_binning_PDF(object):
         :param Delta:
         :return: omega Eq. 29
         '''
+        print('Computing omega model ...')
 
         return (self.c_plus ** (self.m + 1) - self.c_minus ** (self.m + 1)) / self.Delta_LES
 
@@ -821,6 +809,9 @@ class data_binning_PDF(object):
         :param c:
         :return: computes the analytical omega for given c_bar!
         '''
+
+        print('Computing omega DNS ...')
+
         exponent = - (self.beta * (1 - c)) / (1 - self.alpha * (1 - c))
         Eigenval = 18.97  # beta**2 / 2 + beta*(3*alpha - 1.344)
         # --> Eigenval ist wahrscheinlich falsch!
@@ -847,14 +838,10 @@ class data_binning_PDF(object):
         self.omega_model_cbar = self.compute_model_omega_bar()
 
         #self.omega_model_cbar = self.model_omega(self.c_filtered.reshape(self.Nx**3))
-        omega_DNS_unfiltered = self.analytical_omega(self.c_data_np.reshape(self.Nx**3)).reshape(self.Nx,self.Nx,self.Nx)
+        self.omega_DNS = self.analytical_omega(self.c_data_np.reshape(self.Nx**3)).reshape(self.Nx,self.Nx,self.Nx)
 
         # filter the DNS reaction rate
-        self.omega_DNS_filtered = sp.ndimage.filters.gaussian_filter(omega_DNS_unfiltered, [self.Nx, self.Nx, self.Nx], truncate=1.0, mode='reflect')
-
-
-
-
-
+        print('Filtering omega DNS ...')
+        self.omega_DNS_filtered = sp.ndimage.filters.gaussian_filter(self.omega_DNS, [self.Nx, self.Nx, self.Nx], truncate=1.0, mode='reflect')
 
 
