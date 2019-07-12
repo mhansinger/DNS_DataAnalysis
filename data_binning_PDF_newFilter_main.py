@@ -207,13 +207,11 @@ class data_binning_PDF(object):
             return data_filtered
 
         elif self.filter_type == 'TOPHAT':
-            data_filtered = sp.ndimage.filters.uniform_filter(data, [self.filter_width,self.filter_width,self.filter_width], truncate=1.0, mode='reflect')
+            data_filtered = sp.ndimage.filters.uniform_filter(data, [self.filter_width,self.filter_width,self.filter_width],mode='reflect')
             return data_filtered
 
         else:
             sys.exit('No fitler type provided ...')
-
-
 
 
     @jit
@@ -222,13 +220,15 @@ class data_binning_PDF(object):
         # interval is like nth point, skips some nodes
         self.filter_type = filter_type
 
+        print('You are using %s filter!' % self.filter_type)
+
         self.write_csv = write_csv
         self.filter_width = int(filter_width)
 
         # filter the c and rho field
         print('Filtering c field ...')
         self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.rho_c_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES= self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
