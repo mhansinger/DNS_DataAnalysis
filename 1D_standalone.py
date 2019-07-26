@@ -192,7 +192,7 @@ omega_model = model_omega(c_verlauf)
 # compute Delta_DNS
 Delta_DNS = compute_Delta_DNS(xi)
 
-Filter_width = [1,5,10,16,24,32,48,96]
+Filter_width = [1,5,10,16,24,32,48,96,120,200]
 
 plt.figure()
 
