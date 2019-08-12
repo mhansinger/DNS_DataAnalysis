@@ -5,11 +5,9 @@ import matplotlib.pyplot as plt
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 
-
 m = 4.4545
 beta = 6
 alpha = 9/11
-
 
 raw = np.loadtxt('/home/max/Documents/05_DNS_Data/Pfitzner/c_Verlauf_Pfitzner.txt')#np.linspace(0.0001,0.9999,100)
 
@@ -19,7 +17,7 @@ c_verlauf = raw[:,1]
 # try:
 #     c_verlauf = np.loadtxt('C_verlauf.txt')
 # except:
-#     c_path=input('Give the path to C_verlauf.txt')
+#     c_path = input('Give the path to C_verlauf.txt')
 #     c_verlauf = np.loadtxt(c_path)
 
 # check function for delta_0:

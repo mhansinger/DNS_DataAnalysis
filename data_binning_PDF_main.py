@@ -271,7 +271,6 @@ class data_binning_PDF(object):
         if self.case is 'planar_flame_test':
             self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] < 1.1]
 
-
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
         self.dataArray_dd = self.dataArray_dd.sample(frac=0.5)
 
