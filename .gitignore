@@ -4,6 +4,7 @@
 *.pdf
 *.eps
 *.txt
+*.png
 
 *.dat
 __pycache__

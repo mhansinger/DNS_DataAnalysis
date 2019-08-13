@@ -22,6 +22,7 @@ import scipy as sp
 import scipy.ndimage
 import dask.array as da
 import sys
+from scipy import special, interpolate
 
 
 class data_binning_PDF(object):
@@ -215,7 +216,7 @@ class data_binning_PDF(object):
 
 
     @jit
-    def run_analysis_wrinkling(self,filter_width ,filter_type, histogram=False, write_csv=False):
+    def run_analysis_wrinkling(self,filter_width ,filter_type, c_analytical=False, write_csv=False):
         # run the analysis and compute the wrinkling factor -> real 3D cases
         # interval is like nth point, skips some nodes
         self.filter_type = filter_type
@@ -224,6 +225,10 @@ class data_binning_PDF(object):
 
         self.write_csv = write_csv
         self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
 
         # filter the c and rho field
         print('Filtering c field ...')
@@ -236,6 +241,9 @@ class data_binning_PDF(object):
         flame_thickness = self.compute_flamethickness()
         print('Flame thickness: ',flame_thickness)
 
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
         # Set the Gauss kernel
         self.set_gaussian_kernel()
 
@@ -246,6 +254,7 @@ class data_binning_PDF(object):
         # creat dask array and reshape all data
         dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
                                    self.wrinkling_factor.reshape(self.Nx**3,1),
+                                   self.wrinkling_factor_LES.reshape(self.Nx ** 3, 1),
                                    self.omega_model_cbar.reshape(self.Nx**3,1),
                                    self.omega_DNS_filtered.reshape(self.Nx**3,1),
                                    #self.omega_LES_noModel.reshape(self.Nx**3,1),
@@ -258,6 +267,7 @@ class data_binning_PDF(object):
         self.dataArray_dd = dd.io.from_dask_array(dataArray_da,
                                              columns=['c_bar',
                                                       'wrinkling',
+                                                      'wrinkling_LES',
                                                       'omega_model',
                                                       'omega_DNS_filtered',
                                                       #'omega_cbar',
@@ -272,7 +282,7 @@ class data_binning_PDF(object):
             self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] < 1.1]
 
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
-        self.dataArray_dd = self.dataArray_dd.sample(frac=0.5)
+        self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
 
         print('Computing data array ...')
         self.dataArray_df = self.dataArray_dd.compute()
@@ -459,7 +469,7 @@ class data_binning_PDF(object):
 
     #@dask.delayed
     def compute_LES_grad(self):
-        # computes the flame surface area in the DNS based on gradients of c of neighbour cells
+        # computes the flame surface area in the DNS based on gradients of c of neighbour DNS cells
 
         print('Computing LES gradients on DNS mesh ...')
 
@@ -481,7 +491,7 @@ class data_binning_PDF(object):
         return grad_c_LES
 
     def compute_LES_grad_2(self):
-        # computes the flame surface area in the DNS based on gradients of c of neighbour cells
+        # computes the flame surface area in the DNS based on gradients of c of neighbour LES cells
 
         print('Computing LES gradients on LES mesh ...')
 
@@ -503,7 +513,6 @@ class data_binning_PDF(object):
         return grad_c_LES
 
 
-    #@dask.delayed
     def compute_filter_DNS_grad(self):
     # compute filtered DNS reaction rate
         # create empty array
@@ -516,7 +525,7 @@ class data_binning_PDF(object):
 
         return grad_DNS_filtered
 
-    #@dask.delayed
+
     def compute_RR_DNS(self):
 
         c_data_np_vector = self.c_data_np.reshape(self.Nx**3)
@@ -532,7 +541,7 @@ class data_binning_PDF(object):
 
         return RR_DNS
 
-    #@dask.delayed
+
     def filter_RR_DNS(self):
     # compute filtered DNS reaction rate
         # create empty array
@@ -542,7 +551,7 @@ class data_binning_PDF(object):
         return RR_DNS_filtered
 
 
-    #@dask.delayed
+
     def compute_RR_LES(self):
         # according to Pfitzner implementation
         exponent = - self.beta*(1-self.c_filtered.reshape(self.Nx**3)) / (1 - self.alpha*(1 - self.c_filtered.reshape(self.Nx**3)))
@@ -589,7 +598,7 @@ class data_binning_PDF(object):
 
     def compute_s(self,c):
         '''
-        EVTL MUSS FILTERWIDTH NOCH SKALIERT WERDEN!
+        EVTL MUSS FILTERWIDTH NOCH SKALIERT WERDEN! -> Sollte stimmen!
         Sc*Re/sqrt(p/p0)
         Eq. 39
         :param c:
@@ -602,11 +611,26 @@ class data_binning_PDF(object):
     # compute the values for c_minus
     def compute_c_minus(self):
         # Eq. 40
+        # self.c_filtered.reshape(self.Nx**3) = c_bar in der ganzen domain als vector
         this_s = self.compute_s(self.c_filtered.reshape(self.Nx**3))
         this_delta_0 = self.compute_delta_0(this_s)
 
         self.c_minus = (np.exp(self.c_filtered.reshape(self.Nx**3)* this_delta_0 * self.Delta_LES) - 1) / \
                        (np.exp(this_delta_0 * self.Delta_LES) - 1)
+
+
+    # Analytical c_minus (Eq. 35)
+    def compute_c_minus_analytical(self):
+        # generate a dummy c_bar vector
+        c_bar_dummy = np.linspace(0,1,10000)
+
+        # compute c_minus profile based on c_bar_dumma
+        c_minus_profile = c_bar_dummy/self.Delta_LES * \
+                       special.hyp2f1(1,1/self.m,1+1/self.m,c_bar_dummy**self.m)
+
+        # interpolate from c_minus_profile to correct c_minus based on c_filtered
+        f_c = interpolate.interp1d(c_bar_dummy, c_minus_profile,fill_value="extrapolate")
+        self.c_minus = f_c(self.c_filtered.reshape(self.Nx**3))
 
 
     def compute_c_plus(self):
@@ -619,6 +643,7 @@ class data_binning_PDF(object):
 
         xi_plus_Delta = this_xi_m + self.Delta_LES
         self.c_plus = self.compute_c_m(xi_plus_Delta)
+
 
     def compute_model_omega_bar(self):
         '''
@@ -659,8 +684,6 @@ class data_binning_PDF(object):
         Eigenval = 18.97  # beta**2 / 2 + beta*(3*alpha - 1.344)
         # --> Eigenval ist wahrscheinlich falsch!
 
-        #print('Lambda:', Eigenval)
-
         # om_Klein = self.bfact*self.rho_bar*(1-c)*np.exp(exponent)
         om_Pfitzner = Eigenval * ((1 - self.alpha * (1 - c))) ** (-1) * (1 - c) * np.exp(exponent)
 
@@ -672,19 +695,18 @@ class data_binning_PDF(object):
         computes the model values in sequential manner
         '''
 
-        self.compute_c_minus()
-        #print('c_minus is: ',self.c_minus)
+        # switch between the computation modes
+        if self.c_analytical is True:
+            self.compute_c_minus_analytical()
+        else:
+            self.compute_c_minus()
 
         self.compute_c_plus()
-        #print('c_plus is: ', self.c_plus)
 
         self.omega_model_cbar = self.compute_model_omega_bar()
 
         #self.omega_model_cbar = self.model_omega(self.c_filtered.reshape(self.Nx**3))
         self.omega_DNS = self.analytical_omega(self.c_data_np.reshape(self.Nx**3))
-
-        # compute the reaction rate based on c_bar
-        # self.omega_LES_noModel = self.compute_RR_LES()
 
         if len(self.omega_DNS.shape) == 1:
             self.omega_DNS = self.omega_DNS.reshape(self.Nx,self.Nx,self.Nx)
@@ -693,6 +715,5 @@ class data_binning_PDF(object):
         print('Filtering omega DNS ...')
 
         self.omega_DNS_filtered = self.apply_filter(self.omega_DNS) #sp.ndimage.filters.gaussian_filter(self.omega_DNS, self.sigma_xyz, truncate=1.0, mode='reflect')
-
 
 
