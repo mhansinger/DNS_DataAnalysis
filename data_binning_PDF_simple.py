@@ -76,6 +76,17 @@ class data_binning_PDF(object):
             self.Re = 1000
             self.delta_x = 1/611
             self.p = 10
+        elif self.case.startswith('NX512'):
+            # check: Parameter_PlanarFlame.xlsx
+            self.Nx = 512
+            self.bfact = 3675
+            self.Re = 50
+            self.delta_x = 1/120
+            self.p = 1
+            m = 4.4545
+            beta=6
+            alpha=0.81818
+
         else:
             raise ValueError('This case does not exist!\nOnly: 1bar, 5bar, 10bar\n')
 
@@ -367,6 +378,7 @@ class data_binning_PDF(object):
         :param c: usually c_0
         :param m: steepness of the flame front; not sure how computed
         :return: computes self.delta_x_0, needed for c_plus and c_minus
+        Eq. 38
         '''
         return (1 - c ** self.m) / (1-c)
 
@@ -379,7 +391,7 @@ class data_binning_PDF(object):
         :return: c_0
         '''
 
-        self.compute_f()        # update the f value
+        # self.compute_s()        # update the f value
 
         c = self.this_c_bar
         Delta = self.Delta
@@ -389,40 +401,51 @@ class data_binning_PDF(object):
                  (1 - self.f) * \
                  (1 - np.exp(- 2 * (1 - self.this_c_bar) * self.m))
 
+    def compute_s(self):
+        self.s = np.exp(-self.Delta / 7) * ((np.exp(self.Delta / 7) - 1) *
+                                            np.exp(2 * (self.this_c_bar - 1) * self.m) + self.this_c_bar)
+
 
     def compute_c_minus(self):
         '''
         :return: self.c_minus
-        Eq. 37
+        Eq. 40
         '''
-        # update c_0 and delta_0
-        self.compute_c_0()
-        this_delta_0 = self.get_delta_0(c=(1-self.c_0))
 
-        self.c_minus = (np.exp(self.this_c_bar * this_delta_0 * self.Delta)-1) / \
-                       (np.exp(this_delta_0 * self.Delta) - 1)
+        # update s
+        self.compute_s()
+        this_delta_0_s = self.get_delta_0(self.s)
 
+        self.c_minus = (np.exp(self.this_c_bar*self.Delta*this_delta_0_s) - 1) / (np.exp(self.Delta) - 1)
+
+    def compute_c_m(self,xi):
+        '''
+        :param xi: spatial coordinate
+        :return:
+        Eq. 12
+        '''
+        return (1 + np.exp(-self.m * xi)) ** (-1 / self.m)
+
+    def compute_xi_m(self,c):
+        '''
+        :param c: Progress var
+        :return:
+        Eq. 13
+        '''
+        return 1 / self.m * np.log(c ** self.m / (1 - c ** self.m))
 
     def compute_c_plus(self):
         '''
         :return: self.c_plus
         '''
-        # update c_minus
+        # update c_minus first! --> only this function is called in the end
         self.compute_c_minus()
 
-        self.c_plus = (1 + (-1 + self.c_minus ** (-self.m)) * np.exp(-self.Delta * self.m)) ** (-1/self.m)
+        this_xi_c_minus = self.compute_xi_m(self.c_minus)
+
+        self.c_plus = self.compute_c_m(this_xi_c_minus+self.Delta)
 
 
-    def compute_f(self):
-        '''
-        :return: f value, APF. 28
-        '''
-        a = 8.25
-        b = 0.75
-        g = 1/3
-        d = e = 4
-
-        self.f = np.exp(- self.Delta / a) - b * self.this_c_bar ** 2 * np.exp(-g * self.m) * np.exp(-((self.Delta - d)/ e) ** 2)
 
 
 

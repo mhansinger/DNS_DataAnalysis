@@ -2,7 +2,12 @@
 
 *.csv
 *.pdf
+*.eps
+*.txt
+*.png
 
 *.dat
 __pycache__
+
+plots
 
