@@ -502,9 +502,9 @@ class data_binning_PDF(object):
         for l in range(self.filter_width, self.Nx - self.filter_width):
             for m in range(self.filter_width, self.Nx - self.filter_width):
                 for n in range(self.filter_width, self.Nx - self.filter_width):
-                    this_LES_gradX = (self.c_filtered[l + self.filter_width, m, n] - self.c_filtered[l - self.filter_width, m, n]) / (2 * self.Delta_LES)
-                    this_LES_gradY = (self.c_filtered[l, m + self.filter_width, n] - self.c_filtered[l, m - self.filter_width, n]) / (2 * self.Delta_LES)
-                    this_LES_gradZ = (self.c_filtered[l, m, n + self.filter_width] - self.c_filtered[l, m, n - self.filter_width]) / (2 * self.Delta_LES)
+                    this_LES_gradX = (self.c_filtered[l + self.filter_width, m, n] - self.c_filtered[l - self.filter_width, m, n]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradY = (self.c_filtered[l, m + self.filter_width, n] - self.c_filtered[l, m - self.filter_width, n]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradZ = (self.c_filtered[l, m, n + self.filter_width] - self.c_filtered[l, m, n - self.filter_width]) / (2 * self.delta_x * self.filter_width)
                     # compute the magnitude of the gradient
                     this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
 
@@ -544,9 +544,8 @@ class data_binning_PDF(object):
 
     def filter_RR_DNS(self):
     # compute filtered DNS reaction rate
-        # create empty array
 
-        RR_DNS_filtered = self.apply_filter(self.omega_DNS)# sp.ndimage.filters.gaussian_filter(self.omega_DNS, self.sigma_xyz, truncate=1.0, mode='reflect')
+        RR_DNS_filtered = self.apply_filter(self.omega_DNS)
 
         return RR_DNS_filtered
 
