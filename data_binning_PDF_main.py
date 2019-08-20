@@ -532,7 +532,6 @@ class data_binning_PDF(object):
 
         # according to Pfitzner implementation
         exponent = - self.beta*(1 - c_data_np_vector) / (1 - self.alpha*(1 - c_data_np_vector))
-        #this_RR_reshape_DNS = self.bfact*self.rho_data_np.reshape(self.Nx**3)*(1-self.c_data_np.reshape(self.Nx**3))*np.exp(exponent)
 
         this_RR_reshape_DNS_Pfitz  = 18.97 * ((1 - self.alpha * (1 - c_data_np_vector))) ** (-1) \
                                      * (1 - c_data_np_vector) * np.exp(exponent)
@@ -562,7 +561,6 @@ class data_binning_PDF(object):
         RR_LES = this_RR_reshape_LES_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
 
         return RR_LES
-
 
 
     # added Nov. 2018: Implementation of Pfitzner's analytical boundaries
@@ -620,17 +618,35 @@ class data_binning_PDF(object):
 
     # Analytical c_minus (Eq. 35)
     def compute_c_minus_analytical(self):
-        # generate a dummy c_bar vector
-        c_bar_dummy = np.linspace(0,1,10000)
+        # generate a dummy c_minus vector
+        c_minus_dummy = np.linspace(0,0.99999,10000)
 
-        # compute c_minus profile based on c_bar_dumma
-        c_minus_profile = c_bar_dummy/self.Delta_LES * \
-                       special.hyp2f1(1,1/self.m,1+1/self.m,c_bar_dummy**self.m)
+        # compute c_plus
+        this_xi_m = self.compute_xi_m(c_minus_dummy)
+        xi_plus_Delta = this_xi_m + self.Delta_LES
+        c_plus_dummy = self.compute_c_m(xi_plus_Delta)
+
+        # compute upper bound profile based on c_bar_dumma
+        upper_bound = self.I_1(c_plus_dummy)
+        lower_bound = self.I_1(c_minus_dummy)
+
+        c_bar_dummy = (upper_bound - lower_bound) # /self.Delta_LES # nicht sicher Delta_LES
 
         # interpolate from c_minus_profile to correct c_minus based on c_filtered
-        f_c = interpolate.interp1d(c_bar_dummy, c_minus_profile,fill_value="extrapolate")
-        self.c_minus = f_c(self.c_filtered.reshape(self.Nx**3))
+        f_c_minus = interpolate.interp1d(c_bar_dummy, c_minus_dummy,fill_value="extrapolate")
+        f_c_plus = interpolate.interp1d(c_bar_dummy, c_plus_dummy, fill_value="extrapolate")
 
+        # update c_minus and c_plus
+        self.c_minus = f_c_minus(self.c_filtered.reshape(self.Nx**3))
+        self.c_plus = f_c_plus(self.c_filtered.reshape(self.Nx ** 3))
+
+
+    def I_1(self,c):
+        '''
+        :param c:
+        :return: Hypergeometric function (Eq. 35)
+        '''
+        return c / self.Delta_LES * special.hyp2f1(1, 1 / self.m, 1 + 1 / self.m, c ** self.m)
 
     def compute_c_plus(self):
         '''
@@ -699,8 +715,7 @@ class data_binning_PDF(object):
             self.compute_c_minus_analytical()
         else:
             self.compute_c_minus()
-
-        self.compute_c_plus()
+            self.compute_c_plus()
 
         self.omega_model_cbar = self.compute_model_omega_bar()
 
