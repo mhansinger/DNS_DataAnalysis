@@ -261,8 +261,14 @@ class data_binning_PDF(object):
                                    self.c_plus.reshape(self.Nx**3,1),
                                    self.c_minus.reshape(self.Nx**3,1)])
 
-        # write data to csv file
-        filename = join(self.case,'filter_width_'+self.filter_type+'_'+str(self.filter_width)+'.csv')
+
+        if self.c_analytical is True:
+            # write data to csv file
+            filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_analytical.csv')
+        else:
+            # write data to csv file
+            filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '.csv')
+
 
         self.dataArray_dd = dd.io.from_dask_array(dataArray_da,
                                              columns=['c_bar',
@@ -619,7 +625,7 @@ class data_binning_PDF(object):
     # Analytical c_minus (Eq. 35)
     def compute_c_minus_analytical(self):
         # generate a dummy c_minus vector
-        c_minus_dummy = np.linspace(0,0.99999,10000)
+        c_minus_dummy = np.linspace(0,0.99999,100000)
 
         # compute c_plus
         this_xi_m = self.compute_xi_m(c_minus_dummy)
