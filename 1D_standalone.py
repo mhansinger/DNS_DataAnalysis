@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # latex rendering
-plt.rc('text', usetex=True)
-plt.rc('font', family='serif')
+# plt.rc('text', usetex=True)
+# plt.rc('font', family='serif')
 
 m = 4.4545
 beta = 6
@@ -145,99 +145,104 @@ plt.close('all')
 
 omega_verlauf = analytical_omega(alpha = alpha, beta = 6, c = c_verlauf)
 omega_model = model_omega(c_verlauf)
-#
-# plt.figure()
-# fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
-#
-# ax2 = ax1.twinx()
-#
-# ax1.plot(xi,c_verlauf,'b-',label=r'$c$')
-# ax2.plot(xi,omega_verlauf,'r',label=r'$\dot{\omega}$ analytical')
-# ax2.plot(xi,omega_model,'k',label=r'$\dot{\omega}$ model')
-# ax2.set_ylabel(r'$\dot{\omega}$ [1/s]', color='k')
-# ax2.axvspan(-5.5,2.5, alpha=0.2, color='orange')
-#
-# ax1.set_ylabel('c [-]', color='b')
-# ax1.set_xlabel(r"$\xi$", color='k')
-# plt.title("Progress variable and reaction rate")
-# ax1.legend(loc='best', bbox_to_anchor=(0, 0, 0.75, 0.75))
-# ax2.legend(loc='best', bbox_to_anchor=(0, 0, 0.95, 0.95))
-# plt.xlabel('xi')
-# #plt.savefig('c_all2.pdf',format='pdf')
-# plt.show(block=False)
-#
-# # position of filters
-# low = where_nearest(xi,-4)
-# high = where_nearest(xi,0)
-#
-#
-# # plot histogram of
-# plt.figure(figsize=(6, 4))
-# c_plot=c_verlauf[:]
-# omega_mean = omega_verlauf[:].mean()
-# plt.hist(c_plot,bins=60,normed=True,range=[0,1],)
-# c_mean=c_plot.mean()
-# plt.title('$p(c)$')
-# plt.ylabel('Frequency')
-# plt.xlabel('$c$')
-# plt.text(0.12, 12, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
-# plt.text(0.12, 10, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
-# #plt.savefig('histogram_all_c.pdf',format='pdf')
-# plt.show()
-
-
-
-# compute Delta_DNS
-Delta_DNS = compute_Delta_DNS(xi)
-
-Filter_width = [1,5,10,16,24,32,48,96,120,200]
 
 plt.figure()
+fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
 
-# loop over the different Filters
-for Filter in Filter_width:
+ax2 = ax1.twinx()
 
-    omega_analytic_list = []
-    omega_model_list = []
-    c_bar_list = []
+UPPER=2
+LOWER=-6
 
-    Delta_LES = Delta_DNS * Filter
 
-    for i in range(0,len(c_verlauf) - Filter):
+ax1.plot(xi,c_verlauf,'b-',label=r'$c$')
+ax2.plot(xi,omega_verlauf,'r',label=r'$\dot{\omega}$ analytical')
+ax2.plot(xi,omega_model,'k',label=r'$\dot{\omega}$ model')
+ax2.set_ylabel(r'$\dot{\omega}$ [1/s]', color='k')
+ax2.axvspan(LOWER,UPPER, alpha=0.2, color='orange')
 
-        this_c_bar = c_verlauf[i:i + Filter].mean()
-        this_analytical_omega_bar = omega_verlauf[i:i + Filter].mean()
+ax1.set_ylabel('c [-]', color='b')
+ax1.set_xlabel(r"$\xi$", color='k')
+plt.title("Progress variable and reaction rate")
+ax1.legend(loc='best', bbox_to_anchor=(0, 0, 0.75, 0.75))
+ax2.legend(loc='best', bbox_to_anchor=(0, 0, 0.95, 0.95))
+plt.xlabel('xi')
+plt.xlim([-6,3.5])
+plt.savefig('plots/c_all2_%f_%f.png' % (LOWER,UPPER),format='png')
+plt.show(block=False)
 
-        # compute the boundaries:
-        this_c_minus = compute_c_minus(c = this_c_bar,Delta_LES=Delta_LES)
-        this_c_plus = compute_c_plus(c_minus=this_c_minus,Delta_LES=Delta_LES)
+# position of filters
+low = where_nearest(xi,LOWER)
+high = where_nearest(xi,UPPER)
 
-        this_model_omega_bar = model_omega_bar(this_c_plus,this_c_minus, Delta_LES=Delta_LES )
 
-        # print(' ')
-        # print('c_bar: %.2f  c_minus: %.2f  c_plus: %.2f  analytical_omega: %.2f  model_omega: %.2f' %
-        #       (this_c_bar, this_c_minus, this_c_plus, this_analytical_omega_bar, this_model_omega_bar))
+# plot histogram of
+plt.figure(figsize=(6, 4))
+c_plot=c_verlauf[low:high]
+omega_mean = omega_verlauf[low:high].mean()
+plt.hist(c_plot,bins=60,density=True,range=[0,1],)
+c_mean=c_plot.mean()
+plt.title('$p(c)$')
+plt.ylabel('Frequency')
+plt.xlabel('$c$')
+plt.text(0.12, 4, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
+plt.text(0.12, 3, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
+plt.savefig('plots/histogram_all_c_%f_%f.png' % (LOWER,UPPER),format='png')
+plt.show()
 
-        omega_analytic_list.append(this_analytical_omega_bar)
-        omega_model_list.append(this_model_omega_bar)
-        c_bar_list.append(this_c_bar)
 
-    # plt.plot(xi[:-Filter],omega_analytic_list)
-    # plt.title('omega_numerical')
-    # plt.xlabel('xi')
-    # plt.savefig('plots/Omega_numerical_xi.png')
-
-    # plt.figure()
-    plt.title(r"Delta {LES}=%.3f~Delta {DNS}=%.3f~Filter=%i" % (Delta_LES,Delta_DNS,Filter))
-    plt.plot(c_bar_list,omega_analytic_list,'k')
-    plt.plot(c_bar_list,omega_model_list,'r')
-    plt.xlabel(r"\overline{c}")
-    plt.ylabel(r"\overline{\dot{\omega}}")
-    plt.legend([r"\overline{\dot{\omega}}_{DNS}",r"\overline{\dot{\omega}}_{model}"])
-    plt.savefig('plots/Vergleich_Delta_LES_%.3f.png' % Delta_LES)
-
-    #plt.figure()
-    plt.show(block=False)
+#
+# # compute Delta_DNS
+# Delta_DNS = compute_Delta_DNS(xi)
+#
+# Filter_width = [1,5,10,16,24,32,48,96,120,200]
+#
+# plt.figure()
+#
+# # loop over the different Filters
+# for Filter in Filter_width:
+#
+#     omega_analytic_list = []
+#     omega_model_list = []
+#     c_bar_list = []
+#
+#     Delta_LES = Delta_DNS * Filter
+#
+#     for i in range(0,len(c_verlauf) - Filter):
+#
+#         this_c_bar = c_verlauf[i:i + Filter].mean()
+#         this_analytical_omega_bar = omega_verlauf[i:i + Filter].mean()
+#
+#         # compute the boundaries:
+#         this_c_minus = compute_c_minus(c = this_c_bar,Delta_LES=Delta_LES)
+#         this_c_plus = compute_c_plus(c_minus=this_c_minus,Delta_LES=Delta_LES)
+#
+#         this_model_omega_bar = model_omega_bar(this_c_plus,this_c_minus, Delta_LES=Delta_LES )
+#
+#         # print(' ')
+#         # print('c_bar: %.2f  c_minus: %.2f  c_plus: %.2f  analytical_omega: %.2f  model_omega: %.2f' %
+#         #       (this_c_bar, this_c_minus, this_c_plus, this_analytical_omega_bar, this_model_omega_bar))
+#
+#         omega_analytic_list.append(this_analytical_omega_bar)
+#         omega_model_list.append(this_model_omega_bar)
+#         c_bar_list.append(this_c_bar)
+#
+#     # plt.plot(xi[:-Filter],omega_analytic_list)
+#     # plt.title('omega_numerical')
+#     # plt.xlabel('xi')
+#     # plt.savefig('plots/Omega_numerical_xi.png')
+#
+#     # plt.figure()
+#     plt.title(r"Delta {LES}=%.3f~Delta {DNS}=%.3f~Filter=%i" % (Delta_LES,Delta_DNS,Filter))
+#     plt.plot(c_bar_list,omega_analytic_list,'k')
+#     plt.plot(c_bar_list,omega_model_list,'r')
+#     plt.xlabel(r"\overline{c}")
+#     plt.ylabel(r"\overline{\dot{\omega}}")
+#     plt.legend([r"\overline{\dot{\omega}}_{DNS}",r"\overline{\dot{\omega}}_{model}"])
+#     plt.savefig('plots/Vergleich_Delta_LES_%.3f.png' % Delta_LES)
+#
+#     #plt.figure()
+#     plt.show(block=False)
 
 
 
