@@ -26,6 +26,7 @@ from scipy import special, interpolate
 from skimage import measure
 from joblib import delayed, Parallel
 import time
+from progress.bar import ChargingBar
 
 
 class data_binning_PDF(object):
@@ -48,10 +49,11 @@ class data_binning_PDF(object):
         self.data_rho = None
         self.case = case
         self.bins = bins
-        self.write_csv = False
 
         # Filter width of the LES cell: is filled later
         self.filter_width = None
+
+        self.every_nth = None
 
         if self.case is '1bar':
             # NUMBER OF DNS CELLS IN X,Y,Z DIRECTION
@@ -210,7 +212,15 @@ class data_binning_PDF(object):
 
 
     #@jit(nopython=True, parallel=True)
-    def run_analysis_wrinkling(self,filter_width ,filter_type, c_analytical=False, write_csv=False, Parallel=False):
+    def run_analysis_wrinkling(self,filter_width ,filter_type, c_analytical=False, Parallel=False, every_nth=1):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :param Parallel: use False
+        :param every_nth: every nth DNS point to compute the isoArea
+        :return:
+        '''
         # run the analysis and compute the wrinkling factor -> real 3D cases
         # interval is like nth point, skips some nodes
         self.filter_type = filter_type
@@ -218,9 +228,10 @@ class data_binning_PDF(object):
         # joblib parallel computing of c_iso
         self.Parallel = Parallel
 
+        self.every_nth = int(every_nth)
+
         print('You are using %s filter!' % self.filter_type)
 
-        self.write_csv = write_csv
         self.filter_width = int(filter_width)
 
         self.c_analytical = c_analytical
@@ -261,7 +272,7 @@ class data_binning_PDF(object):
             isoArea_coefficient = self.compute_isoArea(c_iso=0.85)
 
         end=time.time()
-        print('compute c_iso took: ', end - start)
+        print('computation of c_iso took %i sec: ' % int(end - start))
 
         # creat dask array and reshape all data
         dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
@@ -306,7 +317,10 @@ class data_binning_PDF(object):
             self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] < 1.1]
 
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
-        self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['isoArea'] >= 1.0]
+
+        # this is to reduce the storage size
+        #self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
 
         print('Computing data array ...')
         self.dataArray_df = self.dataArray_dd.compute()
@@ -623,16 +637,23 @@ class data_binning_PDF(object):
 
     def compute_isoArea(self,c_iso):
         print('Computing the surface for c_iso: ', c_iso)
+        # print('Currently in timing test mode!')
 
         half_filter = int(self.filter_width/2)
 
         # reference area of planar flame
         A_planar = (self.filter_width - 1)**2
 
+        iterpoints = (self.Nx)**3
+        # progress bar
+        bar = ChargingBar('Processing', max=iterpoints)
+
         isoArea_coefficient = np.zeros((self.Nx,self.Nx,self.Nx))
-        for l in range(half_filter, self.Nx - half_filter):
-            for m in range(half_filter, self.Nx - half_filter):
-                for n in range(half_filter, self.Nx - half_filter):
+
+        for l in range(half_filter, self.Nx - half_filter, self.every_nth):
+            for m in range(half_filter, self.Nx - half_filter, self.every_nth):
+                for n in range(half_filter, self.Nx - half_filter, self.every_nth):
+
                     this_LES_box = (self.c_data_np[l-half_filter : l+half_filter,
                                                   m-half_filter : m+half_filter,
                                                   n-half_filter : n+half_filter])
@@ -640,12 +661,21 @@ class data_binning_PDF(object):
                     # this works only if the c_iso value is contained in my array
                     # -> check if array contains values above AND below iso value
                     if np.any(np.where(this_LES_box < c_iso)) and np.any(np.any(np.where(this_LES_box > c_iso))):
+                        #start = time.time()
                         verts, faces = measure.marching_cubes_classic(this_LES_box, c_iso)
                         iso_area = measure.mesh_surface_area(verts=verts, faces=faces)
+                        #end=time.time()
+                        #print(' Time marching cube: ', end-start)
+                        #iso_area = 0
                     else:
                         iso_area = 0
 
                     isoArea_coefficient[l,m,n] = iso_area / A_planar
+
+                    # iterbar
+                    bar.next()
+
+        bar.finish()
 
         return isoArea_coefficient
 
@@ -678,10 +708,10 @@ class data_binning_PDF(object):
 
         # this works only if the c_iso value is contained in my array
         # -> check if array contains values above AND below iso value
-        if np.any(np.where(this_LES_box < c_iso)) and np.any(np.any(np.where(this_LES_box > c_iso))):
+        try: #if np.any(np.where(this_LES_box < c_iso)) and np.any(np.any(np.where(this_LES_box > c_iso))):
             verts, faces = measure.marching_cubes_classic(this_LES_box, c_iso)
             iso_area = measure.mesh_surface_area(verts=verts, faces=faces)
-        else:
+        except ValueError: #else:
             iso_area = 0
 
         #isoArea_coefficient[l, m, n] = iso_area / (self.filter_width - 1) ** 2
