@@ -23,6 +23,10 @@ import scipy.ndimage
 import dask.array as da
 import sys
 from scipy import special, interpolate
+from skimage import measure
+from joblib import delayed, Parallel
+import time
+from progress.bar import ChargingBar
 
 
 class data_binning_PDF(object):
@@ -45,10 +49,11 @@ class data_binning_PDF(object):
         self.data_rho = None
         self.case = case
         self.bins = bins
-        self.write_csv = False
 
         # Filter width of the LES cell: is filled later
         self.filter_width = None
+
+        self.every_nth = None
 
         if self.case is '1bar':
             # NUMBER OF DNS CELLS IN X,Y,Z DIRECTION
@@ -125,20 +130,10 @@ class data_binning_PDF(object):
         # normalizing pressure
         self.p_0 = 1
 
-        # # TO BE COMPUTED
-        # self.c_bar = None
-        # self.rho_bar = None
-        #
-        # self._c_0 = None
-        # self.c_plus = None
-        # self.c_minus = None
-        # #self.omega_bar_model = None
-        # self.wrinkling_factor=None
-        # #self.RR_DNS = None              #Reaction rate computed from DNS Data
-
         # Variables for FILTERING
         self.c_filtered = np.zeros((self.Nx,self.Nx,self.Nx))
         self.rho_filtered = np.zeros((self.Nx,self.Nx,self.Nx))
+        self.c_filtered_clipped = np.zeros((self.Nx,self.Nx,self.Nx))       # c für wrinkling factor nur zw 0.75 und 0.85
 
         # SCHMIDT NUMBER
         self.Sc = 0.7
@@ -186,7 +181,8 @@ class data_binning_PDF(object):
         self.rho_c_data_np = self.data_rho_c.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
 
         # progress variable
-        self.c_data_np=  self.rho_c_data_np / self.rho_data_np
+        self.c_data_np = self.rho_c_data_np / self.rho_data_np
+        self.c_data_reduced_np = self.rho_c_data_np / self.rho_data_np      # reduce c between 0.75 and 0.85
 
     def apply_filter(self,data):
         # filter c and rho data set with gauss filter function
@@ -215,15 +211,27 @@ class data_binning_PDF(object):
             sys.exit('No fitler type provided ...')
 
 
-    @jit
-    def run_analysis_wrinkling(self,filter_width ,filter_type, c_analytical=False, write_csv=False):
+    #@jit(nopython=True, parallel=True)
+    def run_analysis_wrinkling(self,filter_width ,filter_type, c_analytical=False, Parallel=False, every_nth=1):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :param Parallel: use False
+        :param every_nth: every nth DNS point to compute the isoArea
+        :return:
+        '''
         # run the analysis and compute the wrinkling factor -> real 3D cases
         # interval is like nth point, skips some nodes
         self.filter_type = filter_type
 
+        # joblib parallel computing of c_iso
+        self.Parallel = Parallel
+
+        self.every_nth = int(every_nth)
+
         print('You are using %s filter!' % self.filter_type)
 
-        self.write_csv = write_csv
         self.filter_width = int(filter_width)
 
         self.c_analytical = c_analytical
@@ -235,8 +243,12 @@ class data_binning_PDF(object):
         self.rho_filtered = self.apply_filter(self.rho_data_np)
         self.c_filtered = self.apply_filter(self.c_data_np)
 
+        # # reduce c for computation of conditioned wrinkling factor
+        # self.reduce_c(c_min=0.75,c_max=0.85)
+        # self.c_filtered_reduced = self.apply_filter(self.c_data_reduced_np)
+
         # Compute the scaled Delta (Pfitzner PDF)
-        self.Delta_LES= self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
         print('Delta_LES is: %.3f' % self.Delta_LES)
         flame_thickness = self.compute_flamethickness()
         print('Flame thickness: ',flame_thickness)
@@ -251,23 +263,46 @@ class data_binning_PDF(object):
         self.get_wrinkling()
         self.compute_Pfitzner_model()
 
+        #c_bins = self.compute_c_binning(c_low=0.8,c_high=0.9)
+
+        start = time.time()
+        if self.Parallel is True:
+            isoArea_coefficient = self.compute_isoArea_parallel(c_iso=0.85)
+        else:
+            isoArea_coefficient = self.compute_isoArea(c_iso=0.85)
+
+        end=time.time()
+        print('computation of c_iso took %i sec: ' % int(end - start))
+
         # creat dask array and reshape all data
         dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
                                    self.wrinkling_factor.reshape(self.Nx**3,1),
-                                   self.wrinkling_factor_LES.reshape(self.Nx ** 3, 1),
+                                   isoArea_coefficient.reshape(self.Nx**3,1),
+                                   # self.wrinkling_factor_LES.reshape(self.Nx ** 3, 1),
+                                   # self.wrinkling_factor_reduced.reshape(self.Nx ** 3, 1),
+                                   # self.wrinkling_factor_LES_reduced.reshape(self.Nx ** 3, 1),
                                    self.omega_model_cbar.reshape(self.Nx**3,1),
                                    self.omega_DNS_filtered.reshape(self.Nx**3,1),
                                    #self.omega_LES_noModel.reshape(self.Nx**3,1),
                                    self.c_plus.reshape(self.Nx**3,1),
                                    self.c_minus.reshape(self.Nx**3,1)])
 
-        # write data to csv file
-        filename = join(self.case,'filter_width_'+self.filter_type+'_'+str(self.filter_width)+'.csv')
+
+        if self.c_analytical is True:
+            # write data to csv file
+            filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_analytical.csv')
+        else:
+            # write data to csv file
+            filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '.csv')
+
 
         self.dataArray_dd = dd.io.from_dask_array(dataArray_da,
                                              columns=['c_bar',
                                                       'wrinkling',
-                                                      'wrinkling_LES',
+                                                      'isoArea',
+                                                      # 'wrinkling_LES',
+                                                      # 'wrinkling_reduced',
+                                                      # 'wrinkling_LES_reduced',
                                                       'omega_model',
                                                       'omega_DNS_filtered',
                                                       #'omega_cbar',
@@ -282,7 +317,10 @@ class data_binning_PDF(object):
             self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] < 1.1]
 
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
-        self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['isoArea'] >= 1.0]
+
+        # this is to reduce the storage size
+        #self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
 
         print('Computing data array ...')
         self.dataArray_df = self.dataArray_dd.compute()
@@ -436,17 +474,30 @@ class data_binning_PDF(object):
         grad_LES = self.compute_LES_grad()
 
         # wrinkling factor on LES mesh
-        grad_LES_2 = self.compute_LES_grad_2()
+        #grad_LES_2 = self.compute_LES_grad_onLES()
+
+        # # reduced gradients
+        # grad_DNS_filtered_reduced = self.compute_DNS_grad_reduced()
+        # grad_LES_reduced = self.compute_LES_grad_reduced()
+        # grad_LES_2_reduced = self.compute_LES_grad_onLES_reduced()
 
         #compute the wrinkling factor
         print('Computing wrinkling factor ...')
         self.wrinkling_factor = grad_DNS_filtered / grad_LES
-        self.wrinkling_factor_LES = grad_DNS_filtered / grad_LES_2
+        #self.wrinkling_factor_LES = grad_DNS_filtered / grad_LES_2
 
-    #@dask.delayed
+        # correct wrinkling factor
+        #np.place(self.wrinkling_factor_LES,self.wrinkling_factor_LES<1,1)
+
+        #
+        # print('Computing reduced wrinkling factor ... ')
+        # self.wrinkling_factor_reduced = grad_DNS_filtered_reduced / grad_LES_reduced
+        # self.wrinkling_factor_LES_reduced = grad_DNS_filtered_reduced / grad_LES_2_reduced
+
+    #@jit(nopython=True) #, parallel=True)
     def compute_DNS_grad(self):
         # computes the flame surface area in the DNS based on gradients of c of neighbour cells
-        width = 1
+        #width = 1
 
         print('Computing DNS gradients...')
 
@@ -467,7 +518,32 @@ class data_binning_PDF(object):
 
         return grad_c_DNS
 
-    #@dask.delayed
+    #@jit(nopython=True, parallel=True)
+    def compute_DNS_grad_reduced(self):
+        # computes the flame surface area in the DNS based on gradients of c of neighbour cells
+        # for the reduced c
+        #width = 1
+
+        print('Computing DNS gradients for c reduced...')
+
+        # create empty array
+        grad_c_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(1,self.Nx-1):
+            for m in range(1,self.Nx-1):
+                for n in range(1,self.Nx-1):
+                    this_DNS_gradX = (self.c_data_reduced_np[l+1, m, n] - self.c_data_reduced_np[l-1,m, n])/(2 * self.delta_x)
+                    this_DNS_gradY = (self.c_data_reduced_np[l, m+1, n] - self.c_data_reduced_np[l, m-1, n]) / (2 * self.delta_x)
+                    this_DNS_gradZ = (self.c_data_reduced_np[l, m, n+1] - self.c_data_reduced_np[l, m, n-1]) / (2 * self.delta_x)
+                    # compute the magnitude of the gradient
+                    this_DNS_magGrad_c = np.sqrt(this_DNS_gradX**2 + this_DNS_gradY**2 + this_DNS_gradZ**2)
+
+                    grad_c_DNS[l,m,n] = this_DNS_magGrad_c
+
+        return grad_c_DNS
+
+    #@jit(nopython=True)
     def compute_LES_grad(self):
         # computes the flame surface area in the DNS based on gradients of c of neighbour DNS cells
 
@@ -490,7 +566,31 @@ class data_binning_PDF(object):
 
         return grad_c_LES
 
-    def compute_LES_grad_2(self):
+    #@jit(nopython=True)
+    def compute_LES_grad_reduced(self):
+        # computes the flame surface area in the DNS based on gradients of c of neighbour DNS cells
+
+        print('Computing LES gradients on DNS mesh for c reduced ...')
+
+        # create empty array
+        grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(1, self.Nx - 1):
+            for m in range(1, self.Nx - 1):
+                for n in range(1, self.Nx - 1):
+                    this_LES_gradX = (self.c_filtered_reduced[l + 1, m, n] - self.c_filtered_reduced[l - 1, m, n]) / (2 * self.delta_x)
+                    this_LES_gradY = (self.c_filtered_reduced[l, m + 1, n] - self.c_filtered_reduced[l, m - 1, n]) / (2 * self.delta_x)
+                    this_LES_gradZ = (self.c_filtered_reduced[l, m, n + 1] - self.c_filtered_reduced[l, m, n - 1]) / (2 * self.delta_x)
+                    # compute the magnitude of the gradient
+                    this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
+
+                    grad_c_LES[l, m, n] = this_LES_magGrad_c
+
+        return grad_c_LES
+
+    #@jit(nopython=True)
+    def compute_LES_grad_onLES(self):
         # computes the flame surface area in the DNS based on gradients of c of neighbour LES cells
 
         print('Computing LES gradients on LES mesh ...')
@@ -502,9 +602,9 @@ class data_binning_PDF(object):
         for l in range(self.filter_width, self.Nx - self.filter_width):
             for m in range(self.filter_width, self.Nx - self.filter_width):
                 for n in range(self.filter_width, self.Nx - self.filter_width):
-                    this_LES_gradX = (self.c_filtered[l + self.filter_width, m, n] - self.c_filtered[l - self.filter_width, m, n]) / (2 * self.Delta_LES)
-                    this_LES_gradY = (self.c_filtered[l, m + self.filter_width, n] - self.c_filtered[l, m - self.filter_width, n]) / (2 * self.Delta_LES)
-                    this_LES_gradZ = (self.c_filtered[l, m, n + self.filter_width] - self.c_filtered[l, m, n - self.filter_width]) / (2 * self.Delta_LES)
+                    this_LES_gradX = (self.c_filtered[l + self.filter_width, m, n] - self.c_filtered[l - self.filter_width, m, n]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradY = (self.c_filtered[l, m + self.filter_width, n] - self.c_filtered[l, m - self.filter_width, n]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradZ = (self.c_filtered[l, m, n + self.filter_width] - self.c_filtered[l, m, n - self.filter_width]) / (2 * self.delta_x * self.filter_width)
                     # compute the magnitude of the gradient
                     this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
 
@@ -512,14 +612,132 @@ class data_binning_PDF(object):
 
         return grad_c_LES
 
+    #@jit(nopython=True)
+    def compute_LES_grad_onLES_reduced(self):
+        # computes the flame surface area in the DNS based on gradients of c of neighbour LES cells
+
+        print('Computing LES gradients on LES mesh ...')
+
+        # create empty array
+        grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(self.filter_width, self.Nx - self.filter_width):
+            for m in range(self.filter_width, self.Nx - self.filter_width):
+                for n in range(self.filter_width, self.Nx - self.filter_width):
+                    this_LES_gradX = (self.c_filtered_reduced[l + self.filter_width, m, n] - self.c_filtered_reduced[l - self.filter_width, m, n]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradY = (self.c_filtered_reduced[l, m + self.filter_width, n] - self.c_filtered_reduced[l, m - self.filter_width, n]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradZ = (self.c_filtered_reduced[l, m, n + self.filter_width] - self.c_filtered_reduced[l, m, n - self.filter_width]) / (2 * self.delta_x * self.filter_width)
+                    # compute the magnitude of the gradient
+                    this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
+
+                    grad_c_LES[l, m, n] = this_LES_magGrad_c
+
+        return grad_c_LES
+
+    def compute_isoArea(self,c_iso):
+        print('Computing the surface for c_iso: ', c_iso)
+        # print('Currently in timing test mode!')
+
+        half_filter = int(self.filter_width/2)
+
+        # reference area of planar flame
+        A_planar = (self.filter_width - 1)**2
+
+        iterpoints = (self.Nx)**3
+        # progress bar
+        bar = ChargingBar('Processing', max=iterpoints)
+
+        isoArea_coefficient = np.zeros((self.Nx,self.Nx,self.Nx))
+
+        for l in range(half_filter, self.Nx - half_filter, self.every_nth):
+            for m in range(half_filter, self.Nx - half_filter, self.every_nth):
+                for n in range(half_filter, self.Nx - half_filter, self.every_nth):
+
+                    this_LES_box = (self.c_data_np[l-half_filter : l+half_filter,
+                                                  m-half_filter : m+half_filter,
+                                                  n-half_filter : n+half_filter])
+
+                    # this works only if the c_iso value is contained in my array
+                    # -> check if array contains values above AND below iso value
+                    if np.any(np.where(this_LES_box < c_iso)) and np.any(np.any(np.where(this_LES_box > c_iso))):
+                        #start = time.time()
+                        verts, faces = measure.marching_cubes_classic(this_LES_box, c_iso)
+                        iso_area = measure.mesh_surface_area(verts=verts, faces=faces)
+                        #end=time.time()
+                        #print(' Time marching cube: ', end-start)
+                        #iso_area = 0
+                    else:
+                        iso_area = 0
+
+                    isoArea_coefficient[l,m,n] = iso_area / A_planar
+
+                    # iterbar
+                    bar.next()
+
+        bar.finish()
+
+        return isoArea_coefficient
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # this is for the parallel approach with joblib
+    def compute_isoArea_parallel(self,c_iso):
+        print('Computing the surface for c_iso: ', c_iso)
+
+        half_filter = int(self.filter_width/2)
+
+        DNS_range = range(half_filter, self.Nx - half_filter)
+
+        isoArea_coefficient = np.zeros((self.Nx,self.Nx,self.Nx))
+
+        isoArea_list = Parallel(n_jobs=4)(delayed(self.compute_this_LES_box)(l,m,n, half_filter,c_iso,isoArea_coefficient)
+                           for n in DNS_range
+                           for m in DNS_range
+                           for l in DNS_range)
+
+        # reshape isoArea_list into 3D np.array
+        isoArea_coefficient = np.array(isoArea_list).reshape(self.Nx,self.Nx,self.Nx)
+        return isoArea_coefficient
+
+
+    def compute_this_LES_box(self,l,m,n, half_filter,c_iso,isoArea_coefficient):
+
+        this_LES_box = (self.c_data_np[l - half_filter: l + half_filter,
+                        m - half_filter: m + half_filter,
+                        n - half_filter: n + half_filter])
+
+        # this works only if the c_iso value is contained in my array
+        # -> check if array contains values above AND below iso value
+        try: #if np.any(np.where(this_LES_box < c_iso)) and np.any(np.any(np.where(this_LES_box > c_iso))):
+            verts, faces = measure.marching_cubes_classic(this_LES_box, c_iso)
+            iso_area = measure.mesh_surface_area(verts=verts, faces=faces)
+        except ValueError: #else:
+            iso_area = 0
+
+        #isoArea_coefficient[l, m, n] = iso_area / (self.filter_width - 1) ** 2
+
+        return iso_area / (self.filter_width - 1) ** 2
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
     def compute_filter_DNS_grad(self):
     # compute filtered DNS reaction rate
-        # create empty array
-        grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
+         # create empty array
+         #grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
 
         # compute dask delayed object
         grad_c_DNS = self.compute_DNS_grad()
+
+        grad_DNS_filtered = self.apply_filter(grad_c_DNS)
+
+        return grad_DNS_filtered
+
+
+    def compute_filter_DNS_grad_reduced(self):
+    # compute filtered DNS reaction rate
+
+        # compute dask delayed object
+        grad_c_DNS = self.compute_DNS_grad_reduced()
 
         grad_DNS_filtered = self.apply_filter(grad_c_DNS)
 
@@ -532,7 +750,6 @@ class data_binning_PDF(object):
 
         # according to Pfitzner implementation
         exponent = - self.beta*(1 - c_data_np_vector) / (1 - self.alpha*(1 - c_data_np_vector))
-        #this_RR_reshape_DNS = self.bfact*self.rho_data_np.reshape(self.Nx**3)*(1-self.c_data_np.reshape(self.Nx**3))*np.exp(exponent)
 
         this_RR_reshape_DNS_Pfitz  = 18.97 * ((1 - self.alpha * (1 - c_data_np_vector))) ** (-1) \
                                      * (1 - c_data_np_vector) * np.exp(exponent)
@@ -544,12 +761,10 @@ class data_binning_PDF(object):
 
     def filter_RR_DNS(self):
     # compute filtered DNS reaction rate
-        # create empty array
 
-        RR_DNS_filtered = self.apply_filter(self.omega_DNS)# sp.ndimage.filters.gaussian_filter(self.omega_DNS, self.sigma_xyz, truncate=1.0, mode='reflect')
+        RR_DNS_filtered = self.apply_filter(self.omega_DNS)
 
         return RR_DNS_filtered
-
 
 
     def compute_RR_LES(self):
@@ -563,7 +778,6 @@ class data_binning_PDF(object):
         RR_LES = this_RR_reshape_LES_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
 
         return RR_LES
-
 
 
     # added Nov. 2018: Implementation of Pfitzner's analytical boundaries
@@ -621,17 +835,35 @@ class data_binning_PDF(object):
 
     # Analytical c_minus (Eq. 35)
     def compute_c_minus_analytical(self):
-        # generate a dummy c_bar vector
-        c_bar_dummy = np.linspace(0,1,10000)
+        # generate a dummy c_minus vector
+        c_minus_dummy = np.linspace(0,0.99999,100000)
 
-        # compute c_minus profile based on c_bar_dumma
-        c_minus_profile = c_bar_dummy/self.Delta_LES * \
-                       special.hyp2f1(1,1/self.m,1+1/self.m,c_bar_dummy**self.m)
+        # compute c_plus
+        this_xi_m = self.compute_xi_m(c_minus_dummy)
+        xi_plus_Delta = this_xi_m + self.Delta_LES
+        c_plus_dummy = self.compute_c_m(xi_plus_Delta)
+
+        # compute upper bound profile based on c_bar_dumma
+        upper_bound = self.I_1(c_plus_dummy)
+        lower_bound = self.I_1(c_minus_dummy)
+
+        c_bar_dummy = (upper_bound - lower_bound) # /self.Delta_LES # nicht sicher Delta_LES
 
         # interpolate from c_minus_profile to correct c_minus based on c_filtered
-        f_c = interpolate.interp1d(c_bar_dummy, c_minus_profile,fill_value="extrapolate")
-        self.c_minus = f_c(self.c_filtered.reshape(self.Nx**3))
+        f_c_minus = interpolate.interp1d(c_bar_dummy, c_minus_dummy,fill_value="extrapolate")
+        f_c_plus = interpolate.interp1d(c_bar_dummy, c_plus_dummy, fill_value="extrapolate")
 
+        # update c_minus and c_plus
+        self.c_minus = f_c_minus(self.c_filtered.reshape(self.Nx**3))
+        self.c_plus = f_c_plus(self.c_filtered.reshape(self.Nx ** 3))
+
+
+    def I_1(self,c):
+        '''
+        :param c:
+        :return: Hypergeometric function (Eq. 35)
+        '''
+        return c / self.Delta_LES * special.hyp2f1(1, 1 / self.m, 1 + 1 / self.m, c ** self.m)
 
     def compute_c_plus(self):
         '''
@@ -700,8 +932,7 @@ class data_binning_PDF(object):
             self.compute_c_minus_analytical()
         else:
             self.compute_c_minus()
-
-        self.compute_c_plus()
+            self.compute_c_plus()
 
         self.omega_model_cbar = self.compute_model_omega_bar()
 
@@ -717,3 +948,15 @@ class data_binning_PDF(object):
         self.omega_DNS_filtered = self.apply_filter(self.omega_DNS) #sp.ndimage.filters.gaussian_filter(self.omega_DNS, self.sigma_xyz, truncate=1.0, mode='reflect')
 
 
+    # def reduce_c(self,c_min=0.75,c_max=0.85):
+    #     # reduce c between min and max value
+    #     c_data_reduced_np = self.c_data_reduced_np.reshape(self.Nx**3)
+    #
+    #     for i in range(len(c_data_reduced_np)):
+    #         if c_data_reduced_np[i] < c_min: #or c_data_reduced_np[i] > c_max:
+    #             # set c to 0 if not between c_min and c_max
+    #             c_data_reduced_np[i] = c_min
+    #         elif c_data_reduced_np[i] > c_max:
+    #             c_data_reduced_np[i] = c_max
+    #
+    #     self.c_data_reduced_np = c_data_reduced_np.reshape(self.Nx,self.Nx,self.Nx)
