@@ -274,6 +274,15 @@ class data_binning_PDF(object):
         end=time.time()
         print('computation of c_iso took %i sec: ' % int(end - start))
 
+        # write the filtered omega and omega_model * isoArea to file
+        print('writing omega DNS filtered and omega_model x isoArea to file ...')
+        filename = join(self.case, 'filtered_data','omega_filtered_modeled_' + str(self.filter_width) + '.csv')
+        pd.DataFrame(data=np.hstack([self.omega_DNS_filtered.reshape(self.Nx**3,1),
+                           self.omega_model_cbar.reshape(self.Nx**3)*isoArea_coefficient.reshape(self.Nx**3,1),
+                           self.omega_model_cbar.reshape(self.Nx ** 3)*self.wrinkling_factor.reshape(self.Nx**3,1)]),
+                           columns=['omega_filtered','omega_model_by_isoArea','omega_model_by_wrinkling']).to_csv(filename)
+
+
         # creat dask array and reshape all data
         dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
                                    self.wrinkling_factor.reshape(self.Nx**3,1),
@@ -327,7 +336,7 @@ class data_binning_PDF(object):
 
         print('Writing output to csv ...')
         self.dataArray_df.to_csv(filename,index=False)
-        print('Data has been written.')
+        print('Data has been written.\n\n')
 
 
     def plot_histograms(self,c_tilde,this_rho_c_reshape,this_rho_reshape,this_RR_reshape_DNS):
@@ -635,6 +644,7 @@ class data_binning_PDF(object):
 
         return grad_c_LES
 
+
     def compute_isoArea(self,c_iso):
         print('Computing the surface for c_iso: ', c_iso)
         # print('Currently in timing test mode!')
@@ -670,7 +680,10 @@ class data_binning_PDF(object):
                     else:
                         iso_area = 0
 
-                    isoArea_coefficient[l,m,n] = iso_area / A_planar
+                    if iso_area / A_planar < 1:
+                        isoArea_coefficient[l,m,n] = 0
+                    else:
+                        isoArea_coefficient[l, m, n] = iso_area / A_planar
 
                     # iterbar
                     bar.next()
@@ -697,6 +710,7 @@ class data_binning_PDF(object):
 
         # reshape isoArea_list into 3D np.array
         isoArea_coefficient = np.array(isoArea_list).reshape(self.Nx,self.Nx,self.Nx)
+
         return isoArea_coefficient
 
 
@@ -888,6 +902,10 @@ class data_binning_PDF(object):
 
         omega_cbar = ((self.c_plus ** (self.m + 1) - self.c_minus ** (self.m + 1)) / self.Delta_LES)
 
+        # print('Writing omega Pfitzner model to file ...')
+        # filename = join(self.case, 'omega_model_' + str(self.filter_width) + '.csv')
+        # pd.DataFrame(data=omega_cbar.reshape(self.Nx**3),columns=['omega_model']).to_csv(filename)
+
         return omega_cbar.reshape(self.Nx,self.Nx,self.Nx)
 
 
@@ -946,6 +964,7 @@ class data_binning_PDF(object):
         print('Filtering omega DNS ...')
 
         self.omega_DNS_filtered = self.apply_filter(self.omega_DNS) #sp.ndimage.filters.gaussian_filter(self.omega_DNS, self.sigma_xyz, truncate=1.0, mode='reflect')
+
 
 
     # def reduce_c(self,c_min=0.75,c_max=0.85):
