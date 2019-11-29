@@ -278,8 +278,8 @@ class data_binning_PDF(object):
         print('writing omega DNS filtered and omega_model x isoArea to file ...')
         filename = join(self.case, 'filtered_data','omega_filtered_modeled_' + str(self.filter_width) + '.csv')
         pd.DataFrame(data=np.hstack([self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                           self.omega_model_cbar.reshape(self.Nx**3)*isoArea_coefficient.reshape(self.Nx**3,1),
-                           self.omega_model_cbar.reshape(self.Nx ** 3)*self.wrinkling_factor.reshape(self.Nx**3,1)]),
+                           self.omega_model_cbar.reshape(self.Nx**3,1)*isoArea_coefficient.reshape(self.Nx**3,1),
+                           self.omega_model_cbar.reshape(self.Nx ** 3,1)*self.wrinkling_factor.reshape(self.Nx**3,1)]),
                            columns=['omega_filtered','omega_model_by_isoArea','omega_model_by_wrinkling']).to_csv(filename)
 
 
