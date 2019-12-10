@@ -9,7 +9,7 @@ m = 4.4545
 beta = 6
 alpha = 9/11
 
-raw = np.loadtxt('/home/max/Documents/05_DNS_Data/Pfitzner/c_Verlauf_Pfitzner.txt')#np.linspace(0.0001,0.9999,100)
+raw = np.loadtxt('c_Verlauf_Pfitzner.txt')#np.linspace(0.0001,0.9999,100)
 
 xi = raw[:,0]
 c_verlauf = raw[:,1]
