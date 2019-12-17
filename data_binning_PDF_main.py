@@ -284,8 +284,13 @@ class data_binning_PDF(object):
         pd.DataFrame(data=np.hstack([self.omega_DNS.reshape(self.Nx**3,1),
                            self.omega_DNS_filtered.reshape(self.Nx**3,1),
                            om_iso.reshape(self.Nx**3,1),
-                           om_wrinkl.reshape(self.Nx**3,1)]),
-                           columns=['omega_DNS','omega_filtered','omega_model_by_isoArea','omega_model_by_wrinkling']).to_csv(filename)
+                           om_wrinkl.reshape(self.Nx**3,1),
+                           self.c_filtered.reshape(self.Nx ** 3, 1)]),
+                           columns=['omega_DNS',
+                                    'omega_filtered',
+                                    'omega_model_by_isoArea',
+                                    'omega_model_by_wrinkling',
+                                    'c_bar']).to_csv(filename)
 
 
         # creat dask array and reshape all data
