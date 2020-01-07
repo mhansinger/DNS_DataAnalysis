@@ -21,7 +21,11 @@ c_high = 1
 colormap = 'rainbow' #'seismic'#'bwr'#'jet'
 Re = 50
 
+m = 4.454
+
 delta_dx = 1/220
+
+d_th = (m + 1) ** (1 / m + 1) / m
 
 path_to_data = '/media/max/HDD2/HDD2_Data/DNS_Data_Klein/Planar/'
 
@@ -48,10 +52,10 @@ for id, file_name in enumerate(scatter_files):
     # data = data[data.c_bar > c_low]
 
     # PLOTS
-    plt.figure(figsize=(6, 5))
+    plt.figure(figsize=(5, 5))
     c_max = max(data.omega_DNS_filtered) * 1.2
     plt.plot([0, c_max], [0, c_max], '--k', lw=0.5)
-    plt.scatter(data.omega_DNS_filtered, data.omega_model, s=20, c=data.c_bar,
+    plt.scatter(data.omega_DNS_filtered, data.omega_model, s=50, c=data.c_bar,
                 cmap=plt.cm.get_cmap(colormap),rasterized=False)
     # clb = plt.colorbar()
     # plt.clim(c_low, c_high)
@@ -61,7 +65,7 @@ for id, file_name in enumerate(scatter_files):
     # plt.xlabel(r'$\overline{\omega}_{DNS}$')
     # plt.ylabel(r'$\overline{\omega}_m$')
     Delta_LES = round(filter_widths[id] * delta_dx * Re*0.7, 3)
-    plt.title(r'$\Delta_{LES}=%s$ / $n=%s$' % (str(Delta_LES),str(filter_widths[id])))
+    plt.title(r'$\Delta_{LES}=%s\delta_{th}$ / $n=%s$' % (str(round(Delta_LES/d_th,2)),str(filter_widths[id])))
     R2 = round(pearsonr(data.omega_DNS_filtered, data.omega_model)[0],3)
     plt.text(c_max*0.1, c_max*0.85 , r'$R^2=%s$' % str(R2))
     plot_name = join(dir,'plots','scatter_planar_Delta_%s.png' % (str(filter_widths[id])))
