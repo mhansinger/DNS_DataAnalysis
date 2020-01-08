@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import os
 from os.path import join
 import dask.dataframe as dd
-import dask.array as da
 #from numba import jit
 #from mayavi import mlab
 # to free memory
@@ -61,7 +60,7 @@ class data_binning_PDF(object):
             # PARAMETER FOR REACTION RATE
             self.bfact = 7364.0
             # REYNOLDS NUMBER
-            self.Re = 100
+            self.Re = 399 #100
             # DIMENSIONLESS DNS GRID SPACING, DOMAIN IS NOT UNITY
             self.delta_x = 1/188
             # PRESSURE [BAR]
@@ -72,7 +71,7 @@ class data_binning_PDF(object):
         elif self.case=='5bar':
             self.Nx = 560
             self.bfact = 7128.3
-            self.Re = 500
+            self.Re = 892 # 500
             self.delta_x = 1/432
             self.p = 5
             m = 4.4545
@@ -81,7 +80,7 @@ class data_binning_PDF(object):
         elif self.case=='10bar':
             self.Nx = 795
             self.bfact = 7128.3
-            self.Re = 1000
+            self.Re = 1262 #1000
             self.delta_x = 1/611
             self.p = 10
             m = 4.4545
