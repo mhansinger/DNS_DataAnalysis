@@ -1,5 +1,12 @@
+'''
+This is to plot the Histograms from 1D profiles
+'''
+
 import numpy as np
 import matplotlib.pyplot as plt
+
+from scipy.interpolate import interp1d
+from scipy.interpolate import splrep, splev
 
 # latex rendering
 # plt.rc('text', usetex=True)
@@ -11,9 +18,16 @@ alpha = 9/11
 
 raw = np.loadtxt('c_Verlauf_Pfitzner.txt')#np.linspace(0.0001,0.9999,100)
 
-xi = raw[:,0]
-c_verlauf = raw[:,1]
+xi_org = raw[:,0]
+c_org = raw[:,1]
 
+# interpolation function
+interp_func = interp1d(c_org, xi_org,kind='cubic')
+
+c_verlauf = np.linspace(min(c_org), max(c_org), num=500, endpoint=True)
+xi = interp_func(c_verlauf)
+
+# %%
 # try:
 #     c_verlauf = np.loadtxt('C_verlauf.txt')
 # except:
@@ -141,7 +155,7 @@ style = ['b','b--','r','r--']
 
 plt.close('all')
 
-
+# %%
 
 omega_verlauf = analytical_omega(alpha = alpha, beta = 6, c = c_verlauf)
 omega_model = model_omega(c_verlauf)
@@ -152,7 +166,7 @@ fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
 ax2 = ax1.twinx()
 
 UPPER=2
-LOWER=-6
+LOWER=-1
 
 
 ax1.plot(xi,c_verlauf,'b-',label=r'$c$')
@@ -180,7 +194,9 @@ high = where_nearest(xi,UPPER)
 plt.figure(figsize=(6, 4))
 c_plot=c_verlauf[low:high]
 omega_mean = omega_verlauf[low:high].mean()
-plt.hist(c_plot,bins=60,density=True,range=[0,1],)
+
+plt.hist(c_plot,bins=100,density=True,range=[0,1],)
+
 c_mean=c_plot.mean()
 plt.title('$p(c)$')
 plt.ylabel('Frequency')
