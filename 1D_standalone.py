@@ -22,10 +22,10 @@ xi_org = raw[:,0]
 c_org = raw[:,1]
 
 # interpolation function
-interp_func = interp1d(c_org, xi_org,kind='cubic')
+interp_func = interp1d(xi_org,c_org, kind='cubic')
 
-c_verlauf = np.linspace(min(c_org), max(c_org), num=500, endpoint=True)
-xi = interp_func(c_verlauf)
+xi = np.linspace(min(xi_org), max(xi_org), num=5000, endpoint=True)
+c_verlauf = interp_func(xi)
 
 # %%
 # try:
@@ -165,8 +165,10 @@ fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
 
 ax2 = ax1.twinx()
 
-UPPER=2
+UPPER=1
 LOWER=-1
+
+nr_bins = 100
 
 
 ax1.plot(xi,c_verlauf,'b-',label=r'$c$')
@@ -195,7 +197,7 @@ plt.figure(figsize=(6, 4))
 c_plot=c_verlauf[low:high]
 omega_mean = omega_verlauf[low:high].mean()
 
-plt.hist(c_plot,bins=100,density=True,range=[0,1],)
+plt.hist(c_plot,bins=nr_bins,density=True,range=[0,1],)
 
 c_mean=c_plot.mean()
 plt.title('$p(c)$')
