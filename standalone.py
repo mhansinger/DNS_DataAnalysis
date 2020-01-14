@@ -69,14 +69,14 @@ def compute_c_plus(c,Delta):
     return this_c_plus
 
 #style = ['b','b--','r','r--']
-style = ['--','.','-.']
+style = ['-','.','-.']
 
 # define figure size
 plt.figure(figsize=(11,6))
 plt.rc('font', size=15)
 
 i=0
-for Delta in [0.5,2,10]:
+for Delta in [0.1,2,10]:
 
     c_minus = compute_c_minus(c_bar, Delta)
     c_plus = compute_c_plus(c_minus, Delta)
@@ -87,7 +87,7 @@ for Delta in [0.5,2,10]:
 
 #plt.xlabel('c')
 #plt.title('Vergleich mit Fig. 4')
-plt.plot(c_bar,c_bar,'k-')
+# plt.plot(c_bar,c_bar,'k-')
 
 plt.savefig('plots_paper/c_plus_c_minus.eps')
 plt.show()

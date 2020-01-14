@@ -165,10 +165,10 @@ fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
 
 ax2 = ax1.twinx()
 
-UPPER=1
-LOWER=-1
+UPPER=3
+LOWER=-5
 
-nr_bins = 100
+nr_bins = 70
 
 
 ax1.plot(xi,c_verlauf,'b-',label=r'$c$')
@@ -203,8 +203,8 @@ c_mean=c_plot.mean()
 plt.title('$p(c)$')
 plt.ylabel('Frequency')
 plt.xlabel('$c$')
-plt.text(0.12, 4, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
-plt.text(0.12, 3, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
+plt.text(0.12, 14, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
+plt.text(0.12, 11, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
 plt.savefig('plots/histogram_all_c_%f_%f.png' % (LOWER,UPPER),format='png')
 plt.show()
 
@@ -270,24 +270,6 @@ plt.show()
 
 
 
-
-
-
-
-
-# i=0
-# for Delta in [0.1,1,5,10]:
-#
-#     c_minus = compute_c_minus(c_bar, Delta)
-#     c_plus = compute_c_plus(c_minus, Delta)
-#
-#     plt.plot(c_bar, c_minus, style[i])
-#     plt.plot(c_bar, c_plus, style[i])
-#     i=i+1
-#
-# plt.xlabel('c')
-# plt.title('Vergleich mit Fig. 4')
-# plt.show()
 
 
 

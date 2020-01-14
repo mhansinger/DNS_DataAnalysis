@@ -269,6 +269,7 @@ class data_binning_PDF(object):
             isoArea_coefficient = self.compute_isoArea_parallel(c_iso=0.85)
         else:
             isoArea_coefficient = self.compute_isoArea(c_iso=0.85)
+            #isoArea_coefficient = self.compute_isoArea_dynamic()
 
         end=time.time()
         print('computation of c_iso took %i sec: ' % int(end - start))
@@ -291,7 +292,6 @@ class data_binning_PDF(object):
                                     'omega_model_by_wrinkling',
                                     'c_bar']).to_csv(filename)
 
-
         # creat dask array and reshape all data
         dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
                                    self.wrinkling_factor.reshape(self.Nx**3,1),
@@ -313,7 +313,6 @@ class data_binning_PDF(object):
             # write data to csv file
             filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '.csv')
 
-
         self.dataArray_dd = dd.io.from_dask_array(dataArray_da,
                                              columns=['c_bar',
                                                       'wrinkling',
@@ -334,8 +333,9 @@ class data_binning_PDF(object):
         if self.case is 'planar_flame_test':
             self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] < 1.1]
 
-        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
-        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['isoArea'] >= 1.0]
+        #self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
+        #self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['isoArea'] >= 1.0]
+        print('isoArea < 1 is included!')
 
         # this is to reduce the storage size
         #self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
@@ -677,6 +677,57 @@ class data_binning_PDF(object):
                                                   m-half_filter : m+half_filter,
                                                   n-half_filter : n+half_filter])
 
+                    # this works only if the c_iso value is contained in my array
+                    # -> check if array contains values above AND below iso value
+                    if np.any(np.where(this_LES_box < c_iso)) and np.any(np.any(np.where(this_LES_box > c_iso))):
+                        #start = time.time()
+                        verts, faces = measure.marching_cubes_classic(this_LES_box, c_iso)
+                        iso_area = measure.mesh_surface_area(verts=verts, faces=faces)
+                        #end=time.time()
+                        #print(' Time marching cube: ', end-start)
+                        #iso_area = 0
+                    else:
+                        iso_area = 0
+
+                    if iso_area / A_planar < 1:
+                        isoArea_coefficient[l,m,n] = 0
+                    else:
+                        isoArea_coefficient[l, m, n] = iso_area / A_planar
+
+                    # iterbar
+                    bar.next()
+
+        bar.finish()
+
+        return isoArea_coefficient
+
+    def compute_isoArea_dynamic(self):
+        print('Computing the surface for c_iso based on c_bar ')
+        # print('Currently in timing test mode!')
+
+        half_filter = int(self.filter_width/2)
+
+        # reference area of planar flame
+        A_planar = (self.filter_width - 1)**2
+
+        iterpoints = (self.Nx)**3
+        # progress bar
+        bar = ChargingBar('Processing', max=iterpoints)
+
+        isoArea_coefficient = np.zeros((self.Nx,self.Nx,self.Nx))
+
+        for l in range(half_filter, self.Nx - half_filter, self.every_nth):
+            for m in range(half_filter, self.Nx - half_filter, self.every_nth):
+                for n in range(half_filter, self.Nx - half_filter, self.every_nth):
+
+                    this_LES_box = (self.c_data_np[l-half_filter : l+half_filter,
+                                                  m-half_filter : m+half_filter,
+                                                  n-half_filter : n+half_filter])
+
+                    # compute c_bar of current LES box
+                    this_c_bar = np.mean(this_LES_box)
+                    c_iso = this_c_bar
+                    print('c_iso: %f' % c_iso)
                     # this works only if the c_iso value is contained in my array
                     # -> check if array contains values above AND below iso value
                     if np.any(np.where(this_LES_box < c_iso)) and np.any(np.any(np.where(this_LES_box > c_iso))):
@@ -1057,23 +1108,25 @@ class data_binning_cluster(data_binning_PDF):
         end=time.time()
         print('computation of c_iso took %i sec: ' % int(end - start))
 
-        # # write the filtered omega and omega_model * isoArea to file
-        # print('writing omega DNS filtered and omega_model x isoArea to file ...')
-        # filename = join(self.case, 'filtered_data','omega_filtered_modeled_' + str(self.filter_width) +'_nth'+ str(self.every_nth) + '.csv')
-        #
-        # om_iso = self.omega_model_cbar*isoArea_coefficient
-        # om_wrinkl = self.omega_model_cbar*self.wrinkling_factor
-        #
-        # pd.DataFrame(data=np.hstack([self.omega_DNS.reshape(self.Nx**3,1),
-        #                    self.omega_DNS_filtered.reshape(self.Nx**3,1),
-        #                    om_iso.reshape(self.Nx**3,1),
-        #                    om_wrinkl.reshape(self.Nx**3,1),
-        #                    self.c_filtered.reshape(self.Nx ** 3, 1)]),
-        #                    columns=['omega_DNS',
-        #                             'omega_filtered',
-        #                             'omega_model_by_isoArea',
-        #                             'omega_model_by_wrinkling',
-        #                             'c_bar']).to_csv(filename)
+        # write the filtered data of the whole DNS cube only if every data point is filtered. No sparse data...(every_nth > 1)
+        if self.every_nth == 1:
+            # write the filtered omega and omega_model * isoArea to file
+            print('writing omega DNS filtered and omega_model x isoArea to file ...')
+            filename = join(self.case, 'filtered_data','omega_filtered_modeled_' + str(self.filter_width) +'_nth'+ str(self.every_nth) + '.csv')
+
+            om_iso = self.omega_model_cbar*isoArea_coefficient
+            om_wrinkl = self.omega_model_cbar*self.wrinkling_factor
+
+            pd.DataFrame(data=np.hstack([self.omega_DNS.reshape(self.Nx**3,1),
+                               self.omega_DNS_filtered.reshape(self.Nx**3,1),
+                               om_iso.reshape(self.Nx**3,1),
+                               om_wrinkl.reshape(self.Nx**3,1),
+                               self.c_filtered.reshape(self.Nx ** 3, 1)]),
+                               columns=['omega_DNS',
+                                        'omega_filtered',
+                                        'omega_model_by_isoArea',
+                                        'omega_model_by_wrinkling',
+                                        'c_bar']).to_csv(filename)
 
 
         # creat dask array and reshape all data
