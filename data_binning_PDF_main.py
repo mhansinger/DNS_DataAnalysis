@@ -274,23 +274,25 @@ class data_binning_PDF(object):
         end=time.time()
         print('computation of c_iso took %i sec: ' % int(end - start))
 
-        # write the filtered omega and omega_model * isoArea to file
-        print('writing omega DNS filtered and omega_model x isoArea to file ...')
-        filename = join(self.case, 'filtered_data','omega_filtered_modeled_' + str(self.filter_width) +'_nth'+ str(self.every_nth) + '.csv')
+        # write the filtered data of the whole DNS cube only if every data point is filtered. No sparse data...(every_nth > 1)
+        if self.every_nth == 1:
+            # write the filtered omega and omega_model * isoArea to file
+            print('writing omega DNS filtered and omega_model x isoArea to file ...')
+            filename = join(self.case, 'filtered_data','omega_filtered_modeled_' + str(self.filter_width) +'_nth'+ str(self.every_nth) + '.csv')
 
-        om_iso = self.omega_model_cbar*isoArea_coefficient
-        om_wrinkl = self.omega_model_cbar*self.wrinkling_factor
+            om_iso = self.omega_model_cbar*isoArea_coefficient
+            om_wrinkl = self.omega_model_cbar*self.wrinkling_factor
 
-        pd.DataFrame(data=np.hstack([self.omega_DNS.reshape(self.Nx**3,1),
-                           self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                           om_iso.reshape(self.Nx**3,1),
-                           om_wrinkl.reshape(self.Nx**3,1),
-                           self.c_filtered.reshape(self.Nx ** 3, 1)]),
-                           columns=['omega_DNS',
-                                    'omega_filtered',
-                                    'omega_model_by_isoArea',
-                                    'omega_model_by_wrinkling',
-                                    'c_bar']).to_csv(filename)
+            pd.DataFrame(data=np.hstack([self.omega_DNS.reshape(self.Nx**3,1),
+                               self.omega_DNS_filtered.reshape(self.Nx**3,1),
+                               om_iso.reshape(self.Nx**3,1),
+                               om_wrinkl.reshape(self.Nx**3,1),
+                               self.c_filtered.reshape(self.Nx ** 3, 1)]),
+                               columns=['omega_DNS',
+                                        'omega_filtered',
+                                        'omega_model_by_isoArea',
+                                        'omega_model_by_wrinkling',
+                                        'c_bar']).to_csv(filename)
 
         # creat dask array and reshape all data
         dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
