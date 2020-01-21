@@ -1171,8 +1171,8 @@ class data_binning_cluster(data_binning_PDF):
         if self.case is 'planar_flame_test':
             self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] < 1.1]
 
-        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
-        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['isoArea'] >= 1.0]
+        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
+        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['isoArea'] >= 1.0]
 
         # this is to reduce the storage size
         #self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
