@@ -689,10 +689,7 @@ class data_binning_PDF(object):
                     else:
                         iso_area = 0
 
-                    if iso_area / A_planar < 1:
-                        isoArea_coefficient[l,m,n] = 0
-                    else:
-                        isoArea_coefficient[l, m, n] = iso_area / A_planar
+                    isoArea_coefficient[l, m, n] = iso_area / A_planar
 
                     # iterbar
                     bar.next()
