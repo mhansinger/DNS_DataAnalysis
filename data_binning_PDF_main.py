@@ -1173,6 +1173,7 @@ class data_binning_cluster(data_binning_PDF):
 
         # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['wrinkling'] > 0.99]
         # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['isoArea'] >= 1.0]
+        print('isoArea < 1 is included!')
 
         # this is to reduce the storage size
         #self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
