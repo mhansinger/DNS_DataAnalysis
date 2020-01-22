@@ -44,7 +44,7 @@ c_bar = DNS_pd['c_bar'].values.reshape(512,512,512)
 #%%
 colormap = 'seismic' # bwr'#'jet' #'rainbow' #'seismic'#'bwr'#'jet'
 
-x_pos = 230
+x_pos = 250
 
 # plots
 fig=plt.figure(figsize=(5, 5),frameon=False)
