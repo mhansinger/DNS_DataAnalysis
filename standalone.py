@@ -1,7 +1,11 @@
+'''
+Standalone function to plot c+ and c- as functions of m and \Delta
+'''
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-m = 6
+m = 4 #6
 
 <<<<<<< HEAD
 c_Verlauf = np.linspace(0,1,50)
@@ -68,20 +72,28 @@ def compute_c_plus(c,Delta):
 
     return this_c_plus
 
-style = ['b','b--','r','r--']
+#style = ['b','b--','r','r--']
+style = ['-','.','-.']
+
+# define figure size
+plt.figure(figsize=(11,6))
+plt.rc('font', size=15)
 
 i=0
-for Delta in [0.1,1,5,10]:
+for Delta in [0.1,2,10]:
 
     c_minus = compute_c_minus(c_bar, Delta)
     c_plus = compute_c_plus(c_minus, Delta)
 
-    plt.plot(c_bar, c_minus, style[i])
-    plt.plot(c_bar, c_plus, style[i])
+    plt.plot(c_bar, c_minus, 'b'+style[i])
+    plt.plot(c_bar, c_plus, 'r'+style[i])
     i=i+1
 
-plt.xlabel('c')
-plt.title('Vergleich mit Fig. 4')
+#plt.xlabel('c')
+#plt.title('Vergleich mit Fig. 4')
+# plt.plot(c_bar,c_bar,'k-')
+
+plt.savefig('plots_paper/c_plus_c_minus.eps')
 plt.show()
 
 #c_plus, c_minus = compute_c_plus(c_bar,Delta)

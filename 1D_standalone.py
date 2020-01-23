@@ -1,5 +1,12 @@
+'''
+This is to plot the Histograms from 1D profiles
+'''
+
 import numpy as np
 import matplotlib.pyplot as plt
+
+from scipy.interpolate import interp1d
+from scipy.interpolate import splrep, splev
 
 # latex rendering
 # plt.rc('text', usetex=True)
@@ -9,11 +16,18 @@ m = 4.4545
 beta = 6
 alpha = 9/11
 
-raw = np.loadtxt('/home/max/Documents/05_DNS_Data/Pfitzner/c_Verlauf_Pfitzner.txt')#np.linspace(0.0001,0.9999,100)
+raw = np.loadtxt('c_Verlauf_Pfitzner.txt')#np.linspace(0.0001,0.9999,100)
 
-xi = raw[:,0]
-c_verlauf = raw[:,1]
+xi_org = raw[:,0]
+c_org = raw[:,1]
 
+# interpolation function
+interp_func = interp1d(xi_org,c_org, kind='cubic')
+
+xi = np.linspace(min(xi_org), max(xi_org), num=5000, endpoint=True)
+c_verlauf = interp_func(xi)
+
+# %%
 # try:
 #     c_verlauf = np.loadtxt('C_verlauf.txt')
 # except:
@@ -141,7 +155,7 @@ style = ['b','b--','r','r--']
 
 plt.close('all')
 
-
+# %%
 
 omega_verlauf = analytical_omega(alpha = alpha, beta = 6, c = c_verlauf)
 omega_model = model_omega(c_verlauf)
@@ -151,8 +165,10 @@ fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
 
 ax2 = ax1.twinx()
 
-UPPER=2
-LOWER=-6
+UPPER=3
+LOWER=-5
+
+nr_bins = 70
 
 
 ax1.plot(xi,c_verlauf,'b-',label=r'$c$')
@@ -180,13 +196,15 @@ high = where_nearest(xi,UPPER)
 plt.figure(figsize=(6, 4))
 c_plot=c_verlauf[low:high]
 omega_mean = omega_verlauf[low:high].mean()
-plt.hist(c_plot,bins=60,density=True,range=[0,1],)
+
+plt.hist(c_plot,bins=nr_bins,density=True,range=[0,1],)
+
 c_mean=c_plot.mean()
 plt.title('$p(c)$')
 plt.ylabel('Frequency')
 plt.xlabel('$c$')
-plt.text(0.12, 4, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
-plt.text(0.12, 3, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
+plt.text(0.12, 14, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
+plt.text(0.12, 11, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
 plt.savefig('plots/histogram_all_c_%f_%f.png' % (LOWER,UPPER),format='png')
 plt.show()
 
@@ -252,24 +270,6 @@ plt.show()
 
 
 
-
-
-
-
-
-# i=0
-# for Delta in [0.1,1,5,10]:
-#
-#     c_minus = compute_c_minus(c_bar, Delta)
-#     c_plus = compute_c_plus(c_minus, Delta)
-#
-#     plt.plot(c_bar, c_minus, style[i])
-#     plt.plot(c_bar, c_plus, style[i])
-#     i=i+1
-#
-# plt.xlabel('c')
-# plt.title('Vergleich mit Fig. 4')
-# plt.show()
 
 
 
