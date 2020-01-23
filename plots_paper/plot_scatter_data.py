@@ -14,10 +14,10 @@ from scipy.stats import pearsonr
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif', size=16)
 
-case = 'UPRIME15' #'UPRIME15'
+case = 'UPRIME5' #'UPRIME15'
 
-c_low = 0.5
-c_high = 1
+c_low = 0.01
+c_high = 0.99
 colormap = 'rainbow' #'seismic'#'bwr'#'jet'
 Re = 50
 
@@ -146,7 +146,7 @@ for id, file_name in enumerate(scatter_files):
     # plt.xlabel(r'$\overline{c}$')
     # plt.ylabel(r'$\Xi_{iso}$')
     plt.xlim(0, 1)
-    plt.ylim(1, max(data.isoArea)*1.05)
+    plt.ylim(0, max(data.isoArea)*1.05)
     plt.title(r'$\Delta_{LES}=%s\delta_{th}$ / $n=%s$' % (str(round(Delta_LES/d_th,2)),str(filter_widths[id])))
     R2 = round(pearsonr(data.wrinkling, data.isoArea)[0],3)
     plot_name = join(dir,'plots','scatter_Delta_%s_cbar_isoArea.png' % (str(filter_widths[id])))
