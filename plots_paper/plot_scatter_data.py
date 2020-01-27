@@ -14,10 +14,10 @@ from scipy.stats import pearsonr
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif', size=16)
 
-case = 'UPRIME5' #'UPRIME15'
+case = 'UPRIME15' #'UPRIME15'
 
-c_low = 0.01
-c_high = 0.99
+c_low = 0.05
+c_high = 0.97
 colormap = 'rainbow' #'seismic'#'bwr'#'jet'
 Re = 50
 
@@ -33,7 +33,7 @@ dir = join(path_to_data,case)
 
 files_in_dir = os.listdir(dir)
 
-scatter_files = [f for f in files_in_dir if f.endswith('.csv')]
+scatter_files = [f for f in files_in_dir if f.endswith('analytical.csv')]
 
 filter_widths = [int(f.split('_')[-2]) for f in scatter_files]
 
@@ -43,7 +43,14 @@ for id, file_name in enumerate(scatter_files):
     this_file_path =join(dir,file_name)
 
     data = pd.read_csv(this_file_path)
-    data = data.sample(frac=1.0)
+
+    #print(data.head())
+
+    if filter_widths[id] == 16:
+        data = data.sample(frac=0.1)
+    else:
+        data = data.sample(frac=1)
+
     # data.columns
     print('c_max: ', data.c_bar.max())
     print('c_min: ', data.c_bar.min())
@@ -53,6 +60,16 @@ for id, file_name in enumerate(scatter_files):
     # reduce to c_bar > 0.5
     data_org = data
     data = data[data.c_bar > c_low]
+    data = data[data.c_bar < c_high]
+    data = data[data.isoArea > 0]
+    data = data.replace([np.inf, -np.inf], np.nan)     # replace Inf with NaN
+    data = data.dropna(axis=0)                    # axis = 0 --> drop rows where NaN
+
+    try:
+        assert data.isna().values.any() != True
+    except AssertionError:
+        print('NaN in data! remove it...')
+        break
 
     # PLOTS
     plt.figure(figsize=(5, 5))

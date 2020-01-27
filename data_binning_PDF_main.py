@@ -685,6 +685,13 @@ class data_binning_PDF(object):
                                                   m-half_filter : m+half_filter,
                                                   n-half_filter : n+half_filter])
 
+                    ###################################
+                    # use c_bar for small Delta_LES
+                    #print('Small Filter: c_iso = c_bar ')
+                    #if self.filter_width < 16:
+                    c_iso = np.mean(this_LES_box)
+                    ###################################
+
                     # this works only if the c_iso value is contained in my array
                     # -> check if array contains values above AND below iso value
                     if np.any(np.where(this_LES_box < c_iso)) and np.any(np.any(np.where(this_LES_box > c_iso))):
@@ -1200,18 +1207,16 @@ class data_binning_cluster(data_binning_PDF):
 class data_binning_dirac(data_binning_PDF):
     # new implementation with numerical delta dirac function
 
-    def __init__(self, eps_factor=2, c_iso_values=[0.65,0.75,0.85,0.95]):
+    def __init__(self, case, bins, eps_factor=2, c_iso_values=[0.65,0.75,0.85,0.95]):
         # extend super class with additional input parameters
-        super().__init__(self)
+        super(data_binning_dirac, self).__init__(case, bins)
         self.c_iso_values = c_iso_values
         self.eps_factor = eps_factor
         # the convolution of dirac x grad_c at all relevant iso values and LES filtered will be stored here
         self.Xi_iso_filtered = np.zeros((self.Nx,self.Nx,self.Nx,len(self.c_iso_values)))
 
+        print('You are using the Dirac version...')
 
-
-    # TODO
-    # Implement cos-delta function. see Pfitzner notes
     def compute_phi_c(self,c_iso):
         # computes the difference between c(x)-c_iso
         # see Pfitzner notes Eq. 3
@@ -1250,7 +1255,7 @@ class data_binning_dirac(data_binning_PDF):
             # Check Eq. 6 from Pfitzner notes (Generalized wrinkling factor)
             print('Filtering for Xi_iso at c_iso: %f' % c_iso)
             self.Xi_iso_filtered[:,:,:,id] = self.apply_filter(dirac_times_grad_c) / self.Delta_LES**2
-            # TODO: check if self.Delta_LES is correct here!
+            # TODO: check if self.Delta_LES is correct model parameter here
 
     # overrides main method
     def run_analysis_dirac(self,filter_width ,filter_type, c_analytical=False, Parallel=False):
@@ -1350,18 +1355,18 @@ class data_binning_dirac(data_binning_PDF):
 
 
         # remove all Xi_iso < 1e-2 from the stored data set -> less memory
-        self.dataArray_dd = self.dataArray_dd.drop(self.dataArray_dd[
-                                                       (self.dataArray_dd['Xi_iso_0.65'] > 1e-2) &
-                                                       (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
-                                                       (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
-                                                       (self.dataArray_dd['Xi_iso_0.95'] > 1e-2)].index)
+        self.dataArray_dd = self.dataArray_dd[
+                                               (self.dataArray_dd['Xi_iso_0.65'] > 1e-2) &
+                                               (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
+                                               (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
+                                               (self.dataArray_dd['Xi_iso_0.95'] > 1e-2) ]
         print('Xi_iso < 1 are included!')
 
         # this is to reduce the storage size
         #self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
 
         print('Computing data array ...')
-        self.dataArray_df = self.dataArray_dd.compute()
+        self.dataArray_df = self.dataArray_dd.sample(frac=0.1).compute()
 
         print('Writing output to csv ...')
         self.dataArray_df.to_csv(filename,index=False)
