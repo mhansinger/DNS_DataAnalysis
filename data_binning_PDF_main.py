@@ -1377,21 +1377,18 @@ class data_binning_dirac(data_binning_PDF):
                                                       'dirac_05'
                                                       ])
 
-        # # filter the data set and remove unecessary entries
-        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
-        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
-        #
-        #
-        # # remove all Xi_iso < 1e-2 from the stored data set -> less memory
-        # self.dataArray_dd = self.dataArray_dd[
-        #                                         (self.dataArray_dd['Xi_iso_0.5'] > 1e-2) ]#&
-        #                                        # (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
-        #                                        # (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
-        #                                        # (self.dataArray_dd['Xi_iso_0.95'] > 1e-2) ]
-        # print('Xi_iso < 1 are included!')
+        # filter the data set and remove unecessary entries
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
 
-        # this is to reduce the storage size
-        #self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
+
+        # remove all Xi_iso < 1e-2 from the stored data set -> less memory
+        self.dataArray_dd = self.dataArray_dd[
+                                                (self.dataArray_dd['Xi_iso_0.5'] > 1e-2) ]#&
+                                               # (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
+                                               # (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
+                                               # (self.dataArray_dd['Xi_iso_0.95'] > 1e-2) ]
+        print('Xi_iso < 1 are included!')
 
         print('Computing data array ...')
         self.dataArray_df = self.dataArray_dd.sample(frac=0.2).compute()
