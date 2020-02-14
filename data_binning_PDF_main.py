@@ -1202,12 +1202,16 @@ class data_binning_cluster(data_binning_PDF):
         return NotImplementedError
 
 
+
+
+
+###################################################################
 # NEW CLASS WITH PFITZNERS WRINKLING FACTOR
 
 class data_binning_dirac(data_binning_PDF):
     # new implementation with numerical delta dirac function
 
-    def __init__(self, case, bins, eps_factor=2, c_iso_values=[0.65,0.75,0.85,0.95]):
+    def __init__(self, case, bins, eps_factor=66, c_iso_values=[0.5]):
         # extend super class with additional input parameters
         super(data_binning_dirac, self).__init__(case, bins)
         self.c_iso_values = c_iso_values
@@ -1218,10 +1222,10 @@ class data_binning_dirac(data_binning_PDF):
         print('You are using the Dirac version...')
 
     def compute_phi_c(self,c_iso):
-        # computes the difference between c(x)-c_iso
+        # computes the difference between abs(c(x)-c_iso)
         # see Pfitzner notes Eq. 3
 
-        return self.c_data_np - c_iso
+        return abs(self.c_data_np - c_iso)
 
     def compute_dirac_cos(self,c_phi):
         '''
@@ -1231,9 +1235,23 @@ class data_binning_dirac(data_binning_PDF):
         '''
         eps = self.eps_factor*self.delta_x
 
-        dirac = 1/(2*eps) * (1 + np.cos(np.pi * c_phi/eps))
+        X = c_phi/eps
 
-        return dirac
+        # transform to vector
+        X_vec = X.reshape(self.Nx**3)
+
+        dirac_vec = np.zeros(len(X_vec))
+
+        # Fallunterscheidung für X < 0
+        for id, x in enumerate(X_vec):
+            if x < 1:
+                dirac_vec[id] =1/(2*eps) * (1 + np.cos(np.pi * x)) * self.delta_x
+                #print('dirac_vec: ',dirac_vec[id])
+
+        dirac_array = dirac_vec.reshape(self.Nx,self.Nx,self.Nx)
+
+        return dirac_array
+
 
     def compute_Xi_iso_dirac(self):
 
@@ -1247,9 +1265,20 @@ class data_binning_dirac(data_binning_PDF):
             c_phi = self.compute_phi_c(c_iso)
             dirac = self.compute_dirac_cos(c_phi)
             dirac_times_grad_c = (dirac * self.grad_c_DNS).reshape(self.Nx,self.Nx,self.Nx)
+            print('dirac_imes_grad_c: ', dirac_times_grad_c)
 
-            if c_iso == 0.85:
-                self.dirac_times_grad_c_085 = dirac_times_grad_c
+            # check if integral is 1 for arbitrary
+            # Line integral
+            print('line integrals over dirac_times_grad(c):')
+            print(np.trapz(dirac_times_grad_c[:, 250, 250]))
+            print(np.trapz(dirac_times_grad_c[250, :, 250]))
+            print(np.trapz(dirac_times_grad_c[250, 250, :]))
+
+
+            if c_iso == 0.5:
+                #self.dirac_times_grad_c_085 = dirac_times_grad_c
+                self.grad_c_05 = self.grad_c_DNS.reshape(self.Nx,self.Nx,self.Nx)
+                self.dirac_05 = dirac.reshape(self.Nx,self.Nx,self.Nx)
 
             #apply TOPHAT filter to dirac_times_grad_c --> Obtain surface
             # Check Eq. 6 from Pfitzner notes (Generalized wrinkling factor)
@@ -1320,53 +1349,52 @@ class data_binning_dirac(data_binning_PDF):
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
         dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                   self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx**3,1),
-                                  self.Xi_iso_filtered[:, :, :,1].reshape(self.Nx**3,1),
-                                  self.Xi_iso_filtered[:, :, :, 2].reshape(self.Nx**3,1),
-                                  self.Xi_iso_filtered[:, :, :, 3].reshape(self.Nx**3,1),
-                                   self.omega_model_cbar.reshape(self.Nx**3,1),
-                                   self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                                   #self.c_plus.reshape(self.Nx**3,1),
-                                   #self.c_minus.reshape(self.Nx**3,1),
-                                   self.dirac_times_grad_c_085.reshape(self.Nx**3,1)
-
+                                    self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx**3,1),
+                                    # self.Xi_iso_filtered[:, :, :,1].reshape(self.Nx**3,1),
+                                    # self.Xi_iso_filtered[:, :, :, 2].reshape(self.Nx**3,1),
+                                    # self.Xi_iso_filtered[:, :, :, 3].reshape(self.Nx**3,1),
+                                    self.omega_model_cbar.reshape(self.Nx**3,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx**3,1),
+                                    #self.c_plus.reshape(self.Nx**3,1),
+                                    #self.c_minus.reshape(self.Nx**3,1),
+                                    self.grad_c_05.reshape(self.Nx**3,1),
+                                    self.dirac_05.reshape(self.Nx ** 3, 1)
                                   ])
-
-
 
         filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_dirac.csv')
 
         self.dataArray_dd = dd.io.from_dask_array(dataArray_da,
                                              columns=['c_bar',
-                                                      'Xi_iso_0.65',
-                                                      'Xi_iso_0.75',
-                                                      'Xi_iso_0.85',
-                                                      'Xi_iso_0.95',
+                                                      'Xi_iso_0.5',
+                                                      # 'Xi_iso_0.75',
+                                                      # 'Xi_iso_0.85',
+                                                      # 'Xi_iso_0.95',
                                                       'omega_model',
                                                       'omega_DNS_filtered',
                                                       #'c_plus',
                                                       #'c_minus',
-                                                      'grad_DNS_c_085'
+                                                      'grad_DNS_c_05',
+                                                      'dirac_05'
                                                       ])
 
-        # filter the data set and remove unecessary entries
-        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
-        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
-
-
-        # remove all Xi_iso < 1e-2 from the stored data set -> less memory
-        self.dataArray_dd = self.dataArray_dd[
-                                               (self.dataArray_dd['Xi_iso_0.65'] > 1e-2) &
-                                               (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
-                                               (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
-                                               (self.dataArray_dd['Xi_iso_0.95'] > 1e-2) ]
-        print('Xi_iso < 1 are included!')
+        # # filter the data set and remove unecessary entries
+        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
+        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
+        #
+        #
+        # # remove all Xi_iso < 1e-2 from the stored data set -> less memory
+        # self.dataArray_dd = self.dataArray_dd[
+        #                                         (self.dataArray_dd['Xi_iso_0.5'] > 1e-2) ]#&
+        #                                        # (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
+        #                                        # (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
+        #                                        # (self.dataArray_dd['Xi_iso_0.95'] > 1e-2) ]
+        # print('Xi_iso < 1 are included!')
 
         # this is to reduce the storage size
         #self.dataArray_dd = self.dataArray_dd.sample(frac=0.3)
 
         print('Computing data array ...')
-        self.dataArray_df = self.dataArray_dd.sample(frac=0.1).compute()
+        self.dataArray_df = self.dataArray_dd.sample(frac=0.2).compute()
 
         print('Writing output to csv ...')
         self.dataArray_df.to_csv(filename,index=False)
