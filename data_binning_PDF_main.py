@@ -27,6 +27,7 @@ from joblib import delayed, Parallel
 import time
 from progress.bar import ChargingBar
 import itertools
+import copy
 
 
 class data_binning_PDF(object):
@@ -1264,27 +1265,40 @@ class data_binning_dirac(data_binning_PDF):
 
             c_phi = self.compute_phi_c(c_iso)
             dirac = self.compute_dirac_cos(c_phi)
-            dirac_times_grad_c = (dirac * self.grad_c_DNS).reshape(self.Nx,self.Nx,self.Nx)
-            print('dirac_imes_grad_c: ', dirac_times_grad_c)
+            self.dirac_times_grad_c = (dirac * self.grad_c_DNS).reshape(self.Nx,self.Nx,self.Nx)
+            print('dirac_imes_grad_c: ', self.dirac_times_grad_c)
 
             # check if integral is 1 for arbitrary
             # Line integral
             print('line integrals over dirac_times_grad(c):')
-            print(np.trapz(dirac_times_grad_c[:, 250, 250]))
-            print(np.trapz(dirac_times_grad_c[250, :, 250]))
-            print(np.trapz(dirac_times_grad_c[250, 250, :]))
+            # print(np.trapz(dirac_times_grad_c[:, 250, 250]))
+            # print(np.trapz(dirac_times_grad_c[250, :, 250]))
+            print(np.trapz(self.dirac_times_grad_c[250, 250, :]))
 
+            # save the line
+            output_df = pd.DataFrame(data=np.vstack([self.dirac_times_grad_c[250, 250, :],
+                                                    c_phi[250,250,:],
+                                                    dirac[250, 250, :],
+                                                    self.c_data_np[250,250,:]]).transpose(),
+                                     columns=['dirac_grad_c','c_phi','dirac','c'])
+            output_df.to_csv(join(self.case, '1D_data_cube.csv'))
 
             if c_iso == 0.5:
                 #self.dirac_times_grad_c_085 = dirac_times_grad_c
                 self.grad_c_05 = self.grad_c_DNS.reshape(self.Nx,self.Nx,self.Nx)
                 self.dirac_05 = dirac.reshape(self.Nx,self.Nx,self.Nx)
 
+            # TODO: check if that is correct!
+            dirac_LES_sums = self.compute_cell_sum(self.dirac_times_grad_c)
+            self.Xi_iso_filtered[:, :, :, id] = dirac_LES_sums / self.filter_width**2
+
             #apply TOPHAT filter to dirac_times_grad_c --> Obtain surface
             # Check Eq. 6 from Pfitzner notes (Generalized wrinkling factor)
-            print('Filtering for Xi_iso at c_iso: %f' % c_iso)
-            self.Xi_iso_filtered[:,:,:,id] = self.apply_filter(dirac_times_grad_c) / self.Delta_LES**2
-            # TODO: check if self.Delta_LES is correct model parameter here
+            # print('Filtering for Xi_iso at c_iso: %f' % c_iso)
+
+            # # stimmt vermutlich nicht...
+            # self.Xi_iso_filtered[:,:,:,id] = self.apply_filter(self.dirac_times_grad_c) / self.Delta_LES**2
+            # # TTODO: check if self.Delta_LES is correct model parameter here
 
     # overrides main method
     def run_analysis_dirac(self,filter_width ,filter_type, c_analytical=False, Parallel=False):
@@ -1374,8 +1388,7 @@ class data_binning_dirac(data_binning_PDF):
                                                       #'c_plus',
                                                       #'c_minus',
                                                       'grad_DNS_c_05',
-                                                      'dirac_05'
-                                                      ])
+                                                      'dirac_05'])
 
         # filter the data set and remove unecessary entries
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
@@ -1396,6 +1409,35 @@ class data_binning_dirac(data_binning_PDF):
         print('Writing output to csv ...')
         self.dataArray_df.to_csv(filename,index=False)
         print('Data has been written.\n\n')
+
+
+    def compute_cell_sum(self,input_array):
+        # get the sum of values inside an LES cell
+        print('computing cell sum')
+
+        try:
+            assert len(input_array.shape) == 3
+        except AssertionError:
+            print('input array must be 3D!')
+
+        output_array = copy.copy(input_array)
+
+        output_array *= 0.0                 # set output array to zero
+
+        half_filter = int(self.filter_width / 2)
+
+        for l in range(half_filter, self.Nx - half_filter, 1):
+            for m in range(half_filter, self.Nx - half_filter, 1):
+                for n in range(half_filter, self.Nx - half_filter, 1):
+
+                    this_LES_box = (input_array[l - half_filter: l + half_filter,
+                                    m - half_filter: m + half_filter,
+                                    n - half_filter: n + half_filter])
+
+                    # compute c_bar of current LES box
+                    output_array[l,m,n] = this_LES_box.sum()
+
+        return output_array
 
 
     def run_analysis_wrinkling(self,filter_width ,filter_type, c_analytical=False, Parallel=False, every_nth=1):
