@@ -28,6 +28,8 @@ import time
 from progress.bar import ChargingBar
 import itertools
 import copy
+# for numerical integration
+from scipy.integrate import simps
 
 
 class data_binning_PDF(object):
@@ -1449,3 +1451,462 @@ class data_binning_dirac(data_binning_PDF):
 
     def plot_histograms_intervals(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
         return NotImplementedError
+
+
+
+
+###################################################################
+# NEW CLASS WITH PFITZNERS WRINKLING FACTOR
+# THEREs a difference between xi and Xi!!! see the paper...
+
+class data_binning_dirac_xi(data_binning_PDF):
+    # new implementation with numerical delta dirac function
+
+    def __init__(self, case, bins, eps_factor=100, c_iso_values=[0.85]):
+        # extend super class with additional input parameters
+        super(data_binning_dirac_xi, self).__init__(case, bins)
+        self.c_iso_values = c_iso_values
+        self.eps_factor = eps_factor
+        # the convolution of dirac x grad_c at all relevant iso values and LES filtered will be stored here
+        self.Xi_iso_filtered = np.zeros((self.Nx,self.Nx,self.Nx,len(self.c_iso_values)))
+
+        self.xi_np = None        # to be filled
+        self.xi_iso_values = None   # converted c_iso_values into xi-space
+        self.grad_xi_DNS = None     # xi-Field gradients on DNS mesh
+        self.dirac_times_grad_xi = None
+
+        print('You are using the Dirac version...')
+
+    def convert_to_xi(self):
+        # converts the c-field to the xi field (Eq. 13, Pfitzner)
+
+        c_clipped = self.c_data_np*0.9999 + 1e-5
+
+        self.xi_np = 1/self.m * np.log(c_clipped**self.m/ (1 - c_clipped**self.m) )
+        self.xi_iso_values = [1/self.m * np.log(c**self.m/ (1 - c**self.m) ) for c in self.c_iso_values] #is a list
+
+
+    def compute_phi_xi(self,xi_iso):
+        # computes the difference between abs(c(x)-c_iso)
+        # see Pfitzner notes Eq. 3
+
+        return abs(self.xi_np - xi_iso)
+
+    def compute_dirac_cos(self,xi_phi):
+        '''
+        EVERYTHING IS COMPUTED IN xi SPACE!
+        :param xi_phi: xi(x) - xi_iso
+        :param m: scaling factor (Zahedi paper)
+        :return: numerical dirac delta function for whole field
+        '''
+        eps = self.eps_factor*self.delta_x
+
+        X = xi_phi/eps
+
+        # transform to vector
+        X_vec = X.reshape(self.Nx**3)
+
+        dirac_vec = np.zeros(len(X_vec))
+
+        # Fallunterscheidung für X < 0
+        for id, x in enumerate(X_vec):
+            if x < 1:
+                dirac_vec[id] =1/(2*eps) * (1 + np.cos(np.pi * x)) * self.delta_x
+                #print('dirac_vec: ',dirac_vec[id])
+
+        dirac_array = dirac_vec.reshape(self.Nx,self.Nx,self.Nx)
+
+        return dirac_array
+
+
+    def compute_Xi_iso_dirac_xi(self):
+
+        # check if self.grad_c_DNS was computed, if not -> compute it
+        if type(self.grad_xi_DNS) is None:
+            self.compute_DNS_grad_xi()
+
+        # loop over the different c_iso values
+        for id, xi_iso in enumerate(self.xi_iso_values):
+
+            xi_phi = self.compute_phi_xi(xi_iso)
+            dirac_xi = self.compute_dirac_cos(xi_phi)
+            self.dirac_times_grad_xi = (dirac_xi * self.grad_xi_DNS).reshape(self.Nx,self.Nx,self.Nx)
+            #print('dirac_times_grad_xi: ', self.dirac_times_grad_xi)
+
+            # check if integral is 1 for arbitrary
+            # Line integral
+            print('line integrals over dirac_times_grad(c):')
+            # print(np.trapz(dirac_times_grad_c[:, 250, 250]))
+            # print(np.trapz(dirac_times_grad_c[250, :, 250]))
+            print(np.trapz(self.dirac_times_grad_xi[250, 250, :]))
+
+            # save the line
+            output_df = pd.DataFrame(data=np.vstack([self.dirac_times_grad_xi[250, 250, :],
+                                                    xi_phi[250,250,:],
+                                                    dirac_xi[250, 250, :],
+                                                    self.xi_np[250,250,:]]).transpose(),
+                                     columns=['dirac_grad_xi','xi_phi','dirac_xi','xi'])
+            output_df.to_csv(join(self.case, '1D_data_cube.csv'))
+
+            #if xi_iso == 0.85:
+            #self.dirac_times_grad_c_085 = dirac_times_grad_c
+            self.grad_c_05 = self.grad_xi_DNS.reshape(self.Nx,self.Nx,self.Nx)
+            self.dirac_05 = dirac_xi.reshape(self.Nx,self.Nx,self.Nx)
+
+            # TODO: check if that is correct!
+            dirac_LES_sums = self.compute_cell_sum(self.dirac_times_grad_xi)
+            self.Xi_iso_filtered[:, :, :, id] = dirac_LES_sums / self.filter_width**2
+
+    # overrides main method
+    def run_analysis_dirac(self,filter_width ,filter_type, c_analytical=False, Parallel=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :param Parallel: use False
+        :param every_nth: every nth DNS point to compute the isoArea
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        # joblib parallel computing of c_iso
+        self.Parallel = Parallel
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        # filter the c and rho field
+        print('Filtering c field ...')
+        self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+
+        # # reduce c for computation of conditioned wrinkling factor
+        # self.reduce_c(c_min=0.75,c_max=0.85)
+        # self.c_filtered_reduced = self.apply_filter(self.c_data_reduced_np)
+
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+        # Set the Gauss kernel
+        self.set_gaussian_kernel()
+
+        # compute the wrinkling factor: NOT NEEDED here!
+        # self.get_wrinkling()
+
+        # compute abs(grad(c)) on the whole DNS domain
+        self.grad_xi_DNS = self.compute_DNS_grad_xi()
+
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        #c_bins = self.compute_c_binning(c_low=0.8,c_high=0.9)
+
+        # compute Xi iso surface area for all c_iso values
+        self.compute_Xi_iso_dirac_xi()
+
+        # creat dask array and reshape all data
+        # a bit nasty for list in list as of variable c_iso values
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
+                                    self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx**3,1),
+                                    # self.Xi_iso_filtered[:, :, :,1].reshape(self.Nx**3,1),
+                                    # self.Xi_iso_filtered[:, :, :, 2].reshape(self.Nx**3,1),
+                                    # self.Xi_iso_filtered[:, :, :, 3].reshape(self.Nx**3,1),
+                                    self.omega_model_cbar.reshape(self.Nx**3,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx**3,1),
+                                    #self.c_plus.reshape(self.Nx**3,1),
+                                    #self.c_minus.reshape(self.Nx**3,1),
+                                    self.grad_c_05.reshape(self.Nx**3,1),
+                                    self.dirac_05.reshape(self.Nx ** 3, 1)
+                                  ])
+
+        filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_dirac_xi.csv')
+
+        self.dataArray_dd = dd.io.from_dask_array(dataArray_da,
+                                             columns=['c_bar',
+                                                      'Xi_iso_0.5',
+                                                      # 'Xi_iso_0.75',
+                                                      # 'Xi_iso_0.85',
+                                                      # 'Xi_iso_0.95',
+                                                      'omega_model',
+                                                      'omega_DNS_filtered',
+                                                      #'c_plus',
+                                                      #'c_minus',
+                                                      'grad_DNS_c_05',
+                                                      'dirac_05'])
+
+        # filter the data set and remove unecessary entries
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
+
+
+        # remove all Xi_iso < 1e-2 from the stored data set -> less memory
+        self.dataArray_dd = self.dataArray_dd[
+                                                (self.dataArray_dd['Xi_iso_0.5'] > 1e-2) ]#&
+                                               # (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
+                                               # (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
+                                               # (self.dataArray_dd['Xi_iso_0.95'] > 1e-2) ]
+        print('Xi_iso < 1 are included!')
+
+        print('Computing data array ...')
+        self.dataArray_df = self.dataArray_dd.sample(frac=0.2).compute()
+
+        print('Writing output to csv ...')
+        self.dataArray_df.to_csv(filename,index=False)
+        print('Data has been written.\n\n')
+
+
+    def compute_cell_sum(self,input_array):
+        # get the sum of values inside an LES cell
+        print('computing cell sum')
+
+        try:
+            assert len(input_array.shape) == 3
+        except AssertionError:
+            print('input array must be 3D!')
+
+        output_array = copy.copy(input_array)
+
+        output_array *= 0.0                 # set output array to zero
+
+        half_filter = int(self.filter_width / 2)
+
+        for l in range(half_filter, self.Nx - half_filter, 1):
+            for m in range(half_filter, self.Nx - half_filter, 1):
+                for n in range(half_filter, self.Nx - half_filter, 1):
+
+                    this_LES_box = (input_array[l - half_filter: l + half_filter,
+                                    m - half_filter: m + half_filter,
+                                    n - half_filter: n + half_filter])
+
+                    # compute c_bar of current LES box
+                    output_array[l,m,n] = this_LES_box.sum()
+
+        return output_array
+
+    def compute_DNS_grad_xi(self):
+        # computes the flame surface area in the DNS based on gradients of xi of neighbour cells
+        # magnitude of the gradient: abs(grad(c))
+
+        print('Computing DNS gradients in xi space...')
+
+        # check if self.xi_np is filled
+        if self.xi_np is None:
+            self.convert_to_xi()
+
+        # create empty array
+        grad_xi_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(1,self.Nx-1):
+            for m in range(1,self.Nx-1):
+                for n in range(1,self.Nx-1):
+                    this_DNS_gradX = (self.xi_np[l+1, m, n] - self.xi_np[l-1,m, n])/(2 * self.delta_x)
+                    this_DNS_gradY = (self.xi_np[l, m+1, n] - self.xi_np[l, m-1, n]) / (2 * self.delta_x)
+                    this_DNS_gradZ = (self.xi_np[l, m, n+1] - self.xi_np[l, m, n-1]) / (2 * self.delta_x)
+                    # compute the magnitude of the gradient
+                    this_DNS_magGrad_c = np.sqrt(this_DNS_gradX**2 + this_DNS_gradY**2 + this_DNS_gradZ**2)
+
+                    grad_xi_DNS[l,m,n] = this_DNS_magGrad_c
+
+        return grad_xi_DNS
+
+
+    def run_analysis_wrinkling(self,filter_width ,filter_type, c_analytical=False, Parallel=False, every_nth=1):
+        print('Use run_analysis_dirac instead')
+        return NotImplementedError
+
+    def plot_histograms(self, c_tilde, this_rho_c_reshape, this_rho_reshape, this_RR_reshape_DNS):
+        return NotImplementedError
+
+    def plot_histograms_intervals(self,c_tilde,this_rho_c_reshape,this_rho_reshape,c_bar,this_RR_reshape_DNS,wrinkling=1):
+        return NotImplementedError
+
+
+
+
+###################################################################
+# NEW CLASS WITH PFITZNERS FSD FORMULATION FOR GENERALIZED WRINKLING FACTOR
+# SEE report from Pfitzner 12.2.2020
+
+class data_binning_dirac_FSD(data_binning_dirac_xi):
+    # new implementation with numerical delta dirac function
+
+    def __init__(self,case, bins, eps_factor=100,c_iso_values=[0.01,0.4,0.5,0.6,0.7,0.75,0.8,0.85,0.9,0.95,0.99]):
+        # extend super class with additional input parameters
+        super(data_binning_dirac_FSD, self).__init__(case, bins, eps_factor,c_iso_values)
+        # self.c_iso_values = c_iso_values
+        # self.eps_factor = eps_factor
+        # the convolution of dirac x grad_c at all relevant iso values and LES filtered will be stored here
+        #self.Xi_iso_filtered = np.zeros((self.Nx,self.Nx,self.Nx,len(self.c_iso_values)))
+
+        # self.xi_np = None        # to be filled
+        # self.xi_iso_values = None
+        # self.grad_xi_DNS = None
+        # self.dirac_times_grad_xi = None
+
+        # number of c_iso slices
+        self.N_c_iso = len(self.c_iso_values)
+
+        # this is a 4D array to store all dirac values for the different c_iso values
+        self.dirac_xi_fields = np.zeros([self.N_c_iso,self.Nx,self.Nx,self.Nx])
+
+        # set up a new omega_bar field to store the exact solution from the pdf...no real name yet
+        self.omega_model_exact = np.zeros([self.Nx,self.Nx,self.Nx])
+
+        #print('You are using the Dirac version...')
+        print('You are using the new FSD routine...')
+
+    def compute_dirac_xi_iso_fields(self):
+
+        # compute the xi field
+        # self.xi_np and self.xi_iso_values (from self.c_iso_values)
+        self.convert_to_xi()
+
+        # loop over the different c_iso values
+        for id, xi_iso in enumerate(self.xi_iso_values):
+
+            print('Computing delta_dirac in xi-space for c_iso=%f'%self.c_iso_values[id])
+            xi_phi = self.compute_phi_xi(xi_iso)
+            dirac_xi = self.compute_dirac_cos(xi_phi)
+
+            #write each individual dirac_xi field into the storage array
+            self.dirac_xi_fields[id,:,:,:] = dirac_xi
+
+
+    def compute_omega_FSD(self):
+        # omega computation with FSD method according to Pfitzner
+        # omega_bar = \int_0^1 (m+1)*c_iso**m 1/Delta_LES**3 \int_cell \delta(\xi(x) - \xi_iso) dx dc_iso
+
+        print('Computing exact omega bar ...')
+
+        self.compute_dirac_xi_iso_fields()
+
+        half_filter = int(self.filter_width / 2)
+
+        # Loop over the cells ...
+        print('Looping over the cells')
+        for l in range(half_filter,self.Nx-half_filter):
+            for m in range(half_filter,self.Nx-half_filter):
+                for n in range(half_filter,self.Nx-half_filter):
+                    # loop over the individual c_iso/xi_iso values
+
+                    omega_iso_vec = np.zeros(self.N_c_iso)
+                    for id, this_c_iso in enumerate(self.c_iso_values):
+
+                        this_xi_dirac_box = self.dirac_xi_fields[id,l-half_filter:l+half_filter, m-half_filter:m+half_filter, n-half_filter:n+half_filter]
+
+                        # get the integral over the box -> sum up, divide by Volume
+                        omega_over_grad_c = self.compute_omega_over_grad_c(this_c_iso)
+
+                        #TODO: check if Delta_LES**3 is correct!
+                        omega_iso_vec[id] = omega_over_grad_c * 1/self.Delta_LES**3 * this_xi_dirac_box.sum()
+
+                    omega_integrated = simps(omega_iso_vec,self.c_iso_values)   # TODO: Alternativ: xi_iso_values
+
+                    self.omega_model_exact[l,m,n] = omega_integrated
+
+
+    def compute_omega_over_grad_c(self,c_iso):
+        '''
+        Computes the analytical expression for \omega(c*)/|dc*/dx|
+        has to be computed for each c_iso value indivdually
+        :return:
+        '''
+
+        return (self.m + 1)* c_iso** self.m
+
+
+    def run_analysis_dirac_FSD(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        # filter the c and rho field
+        print('Filtering c field ...')
+        self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+
+        # # reduce c for computation of conditioned wrinkling factor
+        # self.reduce_c(c_min=0.75,c_max=0.85)
+        # self.c_filtered_reduced = self.apply_filter(self.c_data_reduced_np)
+
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+        # Set the Gauss kernel
+        # self.set_gaussian_kernel()
+
+        # compute the wrinkling factor: NOT NEEDED here!
+        # self.get_wrinkling()
+
+        # compute abs(grad(c)) on the whole DNS domain
+        # self.grad_xi_DNS = self.compute_DNS_grad_xi()
+
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        # compute omega_model_exact with FSD from Pfitzner
+        self.compute_omega_FSD()
+
+        # creat dask array and reshape all data
+        # a bit nasty for list in list as of variable c_iso values
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
+                                    self.omega_model_exact.reshape(self.Nx**3,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx**3,1)
+                                  ])
+
+        filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_FSD_xi.csv')
+
+        self.dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=['c_bar','omega_model_exact','omega_DNS_filtered'])
+
+        # filter the data set and remove unecessary entries
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
+
+
+        # # remove all Xi_iso < 1e-2 from the stored data set -> less memory
+        # self.dataArray_dd = self.dataArray_dd[
+        #                                         (self.dataArray_dd['Xi_iso_0.5'] > 1e-2) ]#&
+        #                                        # (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
+        #                                        # (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
+        #                                        # (self.dataArray_dd['Xi_iso_0.95'] > 1e-2) ]
+
+        print('Computing data array ...')
+        self.dataArray_df = self.dataArray_dd.sample(frac=0.5).compute()
+
+        print('Writing output to csv ...')
+        self.dataArray_df.to_csv(filename,index=False)
+        print('Data has been written.\n\n')
