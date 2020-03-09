@@ -1866,15 +1866,6 @@ class data_binning_dirac_FSD(data_binning_dirac_xi):
         #maximum possible wrinkling factor
         print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
 
-        # Set the Gauss kernel
-        # self.set_gaussian_kernel()
-
-        # compute the wrinkling factor: NOT NEEDED here!
-        # self.get_wrinkling()
-
-        # compute abs(grad(c)) on the whole DNS domain
-        # self.grad_xi_DNS = self.compute_DNS_grad_xi()
-
         # compute omega based on pfitzner
         self.compute_Pfitzner_model()
 
@@ -1897,12 +1888,151 @@ class data_binning_dirac_FSD(data_binning_dirac_xi):
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
 
 
-        # # remove all Xi_iso < 1e-2 from the stored data set -> less memory
-        # self.dataArray_dd = self.dataArray_dd[
-        #                                         (self.dataArray_dd['Xi_iso_0.5'] > 1e-2) ]#&
-        #                                        # (self.dataArray_dd['Xi_iso_0.75'] > 1e-2) &
-        #                                        # (self.dataArray_dd['Xi_iso_0.85'] > 1e-2) &
-        #                                        # (self.dataArray_dd['Xi_iso_0.95'] > 1e-2) ]
+        print('Computing data array ...')
+        self.dataArray_df = self.dataArray_dd.sample(frac=0.5).compute()
+
+        print('Writing output to csv ...')
+        self.dataArray_df.to_csv(filename,index=False)
+        print('Data has been written.\n\n')
+
+
+
+###################################################################
+# NEW CLASS WITH PFITZNERS FSD FORMULATION FOR GENERALIZED WRINKLING FACTOR
+# SEE report from Pfitzner 12.2.2020
+
+# ALTERNATIVE FORMULATION!!!
+# IDEA: compute iso-fields, then convolute them omega(c)/dc/dxi, then integrate, then filter!
+
+class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
+    # new implementation with numerical delta dirac function
+
+    def __init__(self,case, bins, eps_factor=100,c_iso_values=[0.01,0.4,0.5,0.6,0.7,0.75,0.8,0.85,0.9,0.95,0.99]):
+        # extend super class with additional input parameters
+        super(data_binning_dirac_FSD_alt, self).__init__(case, bins, eps_factor,c_iso_values)
+
+        # number of c_iso slices
+        self.N_c_iso = len(self.c_iso_values)
+
+        # this is a 4D array to store all dirac values for the different c_iso values
+        self.dirac_xi_fields = np.zeros([self.N_c_iso,self.Nx,self.Nx,self.Nx])
+
+        # set up a new omega_bar field to store the exact solution from the pdf...no real name yet
+        self.omega_model_exact = np.zeros([self.Nx,self.Nx,self.Nx])
+
+        print('You are using the new alternative FSD routine...')
+
+    def compute_dirac_xi_iso_fields(self):
+
+        # compute the xi field
+        # self.xi_np and self.xi_iso_values (from self.c_iso_values)
+        self.convert_to_xi()
+
+        # loop over the different c_iso values
+        for id, xi_iso in enumerate(self.xi_iso_values):
+
+            print('Computing delta_dirac in xi-space for c_iso=%f'%self.c_iso_values[id])
+            xi_phi = self.compute_phi_xi(xi_iso)
+            dirac_xi = self.compute_dirac_cos(xi_phi)
+
+            #write each individual dirac_xi field into the storage array
+            self.dirac_xi_fields[id,:,:,:] = dirac_xi
+
+
+    def compute_omega_FSD(self):
+        # omega computation with FSD method according to Pfitzner
+        # omega_bar = \int_0^1 (m+1)*c_iso**m 1/Delta_LES**3 \int_cell \delta(\xi(x) - \xi_iso) dx dc_iso
+
+        print('Computing exact omega bar ...')
+
+        self.compute_dirac_xi_iso_fields()
+
+        # convolute the iso fields wiht omega/dc/dxi
+        for id, this_c_iso in enumerate(self.c_iso_values):
+
+            omega_over_grad_c = self.compute_omega_over_grad_c(this_c_iso)
+            self.dirac_xi_fields[id,:,:,:] = self.dirac_xi_fields[id,:,:,:] * omega_over_grad_c
+
+        # do simpson integration
+        omega_integrated = simps(self.dirac_xi_fields,self.c_iso_values,axis=0)
+
+        try:
+            assert omega_integrated == (self.Nx,self.Nx,self.Nx)
+        except AssertionError:
+            print('omega_integrant shape', omega_integrated.shape)
+
+        print('apply Top Hat filter to omega_integrated')
+        self.omega_model_exact=self.apply_filter(omega_integrated)
+
+
+    def compute_omega_over_grad_c(self,c_iso):
+        '''
+        Computes the analytical expression for \omega(c*)/|dc*/dx|
+        has to be computed for each c_iso value indivdually
+        :return:
+        '''
+
+        return (self.m + 1)* c_iso** self.m
+
+
+    def run_analysis_dirac_FSD(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        # filter the c and rho field
+        print('Filtering c field ...')
+        self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+
+        # # reduce c for computation of conditioned wrinkling factor
+        # self.reduce_c(c_min=0.75,c_max=0.85)
+        # self.c_filtered_reduced = self.apply_filter(self.c_data_reduced_np)
+
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        # compute omega_model_exact with FSD from Pfitzner
+        self.compute_omega_FSD()
+
+        # creat dask array and reshape all data
+        # a bit nasty for list in list as of variable c_iso values
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
+                                    self.omega_model_exact.reshape(self.Nx**3,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx**3,1)
+                                  ])
+
+        filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_FSD_xi_alt.csv')
+
+        self.dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=['c_bar','omega_model_exact','omega_DNS_filtered'])
+
+        # filter the data set and remove unecessary entries
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
+
 
         print('Computing data array ...')
         self.dataArray_df = self.dataArray_dd.sample(frac=0.5).compute()
@@ -1910,3 +2040,6 @@ class data_binning_dirac_FSD(data_binning_dirac_xi):
         print('Writing output to csv ...')
         self.dataArray_df.to_csv(filename,index=False)
         print('Data has been written.\n\n')
+
+
+        
