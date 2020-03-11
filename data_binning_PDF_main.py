@@ -1670,7 +1670,7 @@ class data_binning_dirac_xi(data_binning_PDF):
 
     def compute_cell_sum(self,input_array):
         # get the sum of values inside an LES cell
-        print('computing cell sum')
+        print('computing cell sum...')
 
         try:
             assert len(input_array.shape) == 3
@@ -1907,7 +1907,8 @@ class data_binning_dirac_FSD(data_binning_dirac_xi):
 class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
     # new implementation with numerical delta dirac function
 
-    def __init__(self,case, bins, eps_factor=100,c_iso_values=[0.01,0.4,0.5,0.6,0.7,0.75,0.8,0.85,0.9,0.95,0.99]):
+    def __init__(self,case, bins, eps_factor=100,
+                 c_iso_values=[0.001, 0.3,0.5,0.55,0.6,0.65,0.7,0.725,0.75,0.775,0.8,0.82,0.84,0.85,0.86,0.88,0.9,0.92,0.94,0.98 ,0.999]):
         # extend super class with additional input parameters
         super(data_binning_dirac_FSD_alt, self).__init__(case, bins, eps_factor,c_iso_values)
 
@@ -1951,9 +1952,9 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
         for id, this_c_iso in enumerate(self.c_iso_values):
 
             omega_over_grad_c = self.compute_omega_over_grad_c(this_c_iso)
-            self.dirac_xi_fields[id,:,:,:] = self.dirac_xi_fields[id,:,:,:] * omega_over_grad_c
+            self.dirac_xi_fields[id,:,:,:] = self.dirac_xi_fields[id,:,:,:] * omega_over_grad_c #ACHTUNG: überschreibt self.dirac_xi_fields!
 
-        # do simpson integration
+        # do simpson integration over the whole range of c_iso values
         omega_integrated = simps(self.dirac_xi_fields,self.c_iso_values,axis=0)
 
         try:
@@ -1961,9 +1962,19 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
         except AssertionError:
             print('omega_integrant shape', omega_integrated.shape)
 
-        print('apply Top Hat filter to omega_integrated')
-        self.omega_model_exact=self.apply_filter(omega_integrated)
+        print('Compute cell sum of omega_integrated')
+        # self.omega_model_exact=self.apply_filter(omega_integrated)
+        self.omega_model_exact  = self.compute_cell_sum(omega_integrated)/(self.Delta_LES**3)
 
+        ########################
+        # only temporary
+        print('#################')
+        print('Temporary dump self.dirac_xi_fields to .npy file')
+        print('#################')
+        filename = join(self.case,
+                        'filter_width_' + str(self.filter_width) + '_iso_fields.npy')
+        np.save(filename,self.dirac_xi_fields)
+        ########################
 
     def compute_omega_over_grad_c(self,c_iso):
         '''
@@ -2035,7 +2046,7 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
 
 
         print('Computing data array ...')
-        self.dataArray_df = self.dataArray_dd.sample(frac=0.5).compute()
+        self.dataArray_df = self.dataArray_dd.sample(frac=0.3).compute()
 
         print('Writing output to csv ...')
         self.dataArray_df.to_csv(filename,index=False)
