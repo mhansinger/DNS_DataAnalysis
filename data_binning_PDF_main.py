@@ -1038,20 +1038,8 @@ class data_binning_PDF(object):
         # filter the DNS reaction rate
         print('Filtering omega DNS ...')
 
-        self.omega_DNS_filtered = self.apply_filter(self.omega_DNS) #sp.ndimage.filters.gaussian_filter(self.omega_DNS, self.sigma_xyz, truncate=1.0, mode='reflect')
+        self.omega_DNS_filtered = self.apply_filter(self.omega_DNS)
 
-    # def reduce_c(self,c_min=0.75,c_max=0.85):
-    #     # reduce c between min and max value
-    #     c_data_reduced_np = self.c_data_reduced_np.reshape(self.Nx**3)
-    #
-    #     for i in range(len(c_data_reduced_np)):
-    #         if c_data_reduced_np[i] < c_min: #or c_data_reduced_np[i] > c_max:
-    #             # set c to 0 if not between c_min and c_max
-    #             c_data_reduced_np[i] = c_min
-    #         elif c_data_reduced_np[i] > c_max:
-    #             c_data_reduced_np[i] = c_max
-    #
-    #     self.c_data_reduced_np = c_data_reduced_np.reshape(self.Nx,self.Nx,self.Nx)
 
 
 
@@ -1291,7 +1279,7 @@ class data_binning_dirac(data_binning_PDF):
                 self.dirac_05 = dirac.reshape(self.Nx,self.Nx,self.Nx)
 
             # TODO: check if that is correct!
-            dirac_LES_sums = self.compute_cell_sum(self.dirac_times_grad_c)
+            dirac_LES_sums = self.compute_LES_cell_sum(self.dirac_times_grad_c)
             self.Xi_iso_filtered[:, :, :, id] = dirac_LES_sums / self.filter_width**2
 
             #apply TOPHAT filter to dirac_times_grad_c --> Obtain surface
@@ -1413,7 +1401,7 @@ class data_binning_dirac(data_binning_PDF):
         print('Data has been written.\n\n')
 
 
-    def compute_cell_sum(self,input_array):
+    def compute_LES_cell_sum(self,input_array):
         # get the sum of values inside an LES cell
         print('computing cell sum')
 
@@ -1554,7 +1542,7 @@ class data_binning_dirac_xi(data_binning_PDF):
             self.dirac_05 = dirac_xi.reshape(self.Nx,self.Nx,self.Nx)
 
             # TODO: check if that is correct!
-            dirac_LES_sums = self.compute_cell_sum(self.dirac_times_grad_xi)
+            dirac_LES_sums = self.compute_LES_cell_sum(self.dirac_times_grad_xi)
             self.Xi_iso_filtered[:, :, :, id] = dirac_LES_sums / self.filter_width**2
 
     # overrides main method
@@ -1668,7 +1656,7 @@ class data_binning_dirac_xi(data_binning_PDF):
         print('Data has been written.\n\n')
 
 
-    def compute_cell_sum(self,input_array):
+    def compute_LES_cell_sum(self,input_array):
         # get the sum of values inside an LES cell
         print('computing cell sum...')
 
@@ -1923,6 +1911,7 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
 
         print('You are using the new alternative FSD routine...')
 
+
     def compute_dirac_xi_iso_fields(self):
 
         # compute the xi field
@@ -1962,19 +1951,27 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
         except AssertionError:
             print('omega_integrant shape', omega_integrated.shape)
 
-        print('Compute cell sum of omega_integrated')
-        # self.omega_model_exact=self.apply_filter(omega_integrated)
-        self.omega_model_exact  = self.compute_cell_sum(omega_integrated)/(self.Delta_LES**3)
+        # print('Compute cell sum of omega_integrated')
+        # # self.omega_model_exact=self.apply_filter(omega_integrated)
+        # self.omega_model_exact  = self.compute_LES_cell_sum(omega_integrated)/(self.Delta_LES**3)
 
-        ########################
-        # only temporary
-        print('#################')
-        print('Temporary dump self.dirac_xi_fields to .npy file')
-        print('#################')
-        filename = join(self.case,
-                        'filter_width_' + str(self.filter_width) + '_iso_fields.npy')
-        np.save(filename,self.dirac_xi_fields)
-        ########################
+        # #ALTERNATIVE ???
+        print('Top Hat filtering to get omega_model_exact')
+        self.omega_model_exact  = self.apply_filter(omega_integrated)/(self.delta_x*self.Sc * self.Re * np.sqrt(self.p/self.p_0))**3
+
+        # ########################
+        # # only temporary
+        # print('#################')
+        # print('Temporary dump self.dirac_xi_fields to .npy file')
+        # print('#################')
+        # filename = join(self.case,
+        #                 'filter_width_' + str(self.filter_width) + '_iso_fields.npy')
+        # np.save(filename,self.dirac_xi_fields)
+        # ########################
+
+        # free memory
+        del self.dirac_xi_fields
+
 
     def compute_omega_over_grad_c(self,c_iso):
         '''
@@ -2028,6 +2025,11 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
 
         # compute omega_model_exact with FSD from Pfitzner
         self.compute_omega_FSD()
+
+        # print('write omega_DNS')
+        # filename = join(self.case,
+        #                 'filter_width_' + str(self.filter_width) + '_omega_DNS.npy')
+        # np.save(filename,self.omega_DNS)
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
