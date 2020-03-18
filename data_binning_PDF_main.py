@@ -2016,16 +2016,6 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
         print('Top Hat filtering to get omega_model_exact')
         self.omega_model_exact  = self.apply_filter(omega_integrated)/(self.Delta_LES/self.filter_width)**3
 
-        # ########################
-        # # only temporary
-        # print('#################')
-        # print('Temporary dump self.dirac_xi_fields to .npy file')
-        # print('#################')
-        # filename = join(self.case,
-        #                 'filter_width_' + str(self.filter_width) + '_iso_fields.npy')
-        # np.save(filename,self.dirac_xi_fields)
-        # ########################
-
         # free some memory, field is not needed anymore case
         del self.dirac_xi_fields
 
@@ -2155,7 +2145,7 @@ class data_binning_dirac_compare(data_binning_dirac_FSD_alt):
 
         # check if self.grad_c_DNS was computed, if not -> compute it
         if type(self.grad_c_DNS) is None:
-            self.grad_c_DNS = self.compute_DNS_grad()
+            self.grad_c_DNS = self.compute_DNS_grad_4thO()
 
         grad_c_DNS_vec = self.grad_c_DNS.reshape(self.Nx**3)
 
@@ -2207,7 +2197,7 @@ class data_binning_dirac_compare(data_binning_dirac_FSD_alt):
         #maximum possible wrinkling factor
         print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
 
-        # compute omega based on pfitzner
+        # compute self.omega_model_cbar: the Pfitzner model for the planar flame
         self.compute_Pfitzner_model()
 
         # 1st method
@@ -2221,28 +2211,34 @@ class data_binning_dirac_compare(data_binning_dirac_FSD_alt):
         Xi_iso_cbar = self.compute_Xi_iso_dirac_c(c_iso=self.c_filtered)
 
         # 4th method
-        wrinkling_factor = self.get_wrinkling()
+        wrinkling_factor = self.get_wrinkling(order='4th')
 
-        # print('write omega_DNS')
-        # filename = join(self.case,
-        #                 'filter_width_' + str(self.filter_width) + '_omega_DNS.npy')
-        # np.save(filename,self.omega_DNS)
 
-        # creat dask array and reshape all data
-        # a bit nasty for list in list as of variable c_iso values
+        # prepare data for output to csv file
         dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                    self.omega_model_exact.reshape(self.Nx**3,1),
-                                    self.omega_DNS_filtered.reshape(self.Nx**3,1)
+                                  self.omega_model_exact.reshape(self.Nx**3,1),
+                                  self.omega_DNS_filtered.reshape(self.Nx**3,1),
+                                  self.omega_model_cbar.reshape(self.Nx**3,1),
+                                  Xi_iso_085.reshape(self.Nx**3,1),
+                                  Xi_iso_cbar.reshape(self.Nx**3,1),
+                                  wrinkling_factor.reshape(self.Nx**3,1)
                                   ])
 
-        filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_FSD_xi_alt.csv')
+        filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_compare.csv')
 
-        self.dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=['c_bar','omega_model_exact','omega_DNS_filtered'])
+        self.dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=
+                                                  ['c_bar',
+                                                   'omega_model_FSD',
+                                                   'omega_DNS_filtered',
+                                                   'omega_model_planar',
+                                                   'Xi_iso_085',
+                                                   'Xi_iso_cbar',
+                                                   'wrinkling_factor'
+                                                   ])
 
         # filter the data set and remove unecessary entries
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
-
 
         print('Computing data array ...')
         self.dataArray_df = self.dataArray_dd.sample(frac=0.3).compute()
