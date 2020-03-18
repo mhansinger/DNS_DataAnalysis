@@ -33,7 +33,7 @@ dir = join(path_to_data,case)
 
 files_in_dir = os.listdir(dir)
 
-scatter_files = [f for f in files_in_dir if f.endswith('analytical.csv')]
+scatter_files = [f for f in files_in_dir if f.endswith('dirac.csv')]
 
 filter_widths = [int(f.split('_')[-2]) for f in scatter_files]
 

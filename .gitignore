@@ -9,5 +9,6 @@
 *.dat
 __pycache__
 
+*.npy
 plots
 
