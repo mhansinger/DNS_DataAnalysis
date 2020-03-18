@@ -496,32 +496,25 @@ class data_binning_PDF(object):
                             np.exp(-6*(x**2/self.Delta_LES**2 +y**2/self.Delta_LES**2 + z**2/self.Delta_LES**2))
 
 
-    def get_wrinkling(self):
+    def get_wrinkling(self,order='2nd'):
         # computes the wriknling factor from resolved and filtered flame surface
         #print(i)
 
-        grad_DNS_filtered = self.compute_filter_DNS_grad()
-        grad_LES = self.compute_LES_grad()
-
-        # wrinkling factor on LES mesh
-        #grad_LES_2 = self.compute_LES_grad_onLES()
-
-        # # reduced gradients
-        # grad_DNS_filtered_reduced = self.compute_DNS_grad_reduced()
-        # grad_LES_reduced = self.compute_LES_grad_reduced()
-        # grad_LES_2_reduced = self.compute_LES_grad_onLES_reduced()
+        if order == '2nd':
+            grad_DNS_filtered = self.compute_filter_DNS_grad()
+            grad_LES = self.compute_LES_grad()
+        elif order == '4th':
+            grad_DNS_filtered = self.compute_filter_DNS_grad_4thO()
+            grad_LES = self.compute_LES_grad_4thO()
+        else:
+            print('Order not defined. Only 2nd and 4th possible...')
+            raise NotImplementedError
 
         #compute the wrinkling factor
         print('Computing wrinkling factor ...')
         self.wrinkling_factor = grad_DNS_filtered / grad_LES
-        #self.wrinkling_factor_LES = grad_DNS_filtered / grad_LES_2
 
-        # correct wrinkling factor
-        # np.place(self.wrinkling_factor_LES,self.wrinkling_factor_LES<1,1)
 
-        # print('Computing reduced wrinkling factor ... ')
-        # self.wrinkling_factor_reduced = grad_DNS_filtered_reduced / grad_LES_reduced
-        # self.wrinkling_factor_LES_reduced = grad_DNS_filtered_reduced / grad_LES_2_reduced
 
     #@jit(nopython=True) #, parallel=True)
     def compute_DNS_grad(self):
@@ -540,6 +533,28 @@ class data_binning_PDF(object):
                     this_DNS_gradX = (self.c_data_np[l+1, m, n] - self.c_data_np[l-1,m, n])/(2 * self.delta_x)
                     this_DNS_gradY = (self.c_data_np[l, m+1, n] - self.c_data_np[l, m-1, n]) / (2 * self.delta_x)
                     this_DNS_gradZ = (self.c_data_np[l, m, n+1]- self.c_data_np[l, m, n-1]) / (2 * self.delta_x)
+                    # compute the magnitude of the gradient
+                    this_DNS_magGrad_c = np.sqrt(this_DNS_gradX**2 + this_DNS_gradY**2 + this_DNS_gradZ**2)
+
+                    grad_c_DNS[l,m,n] = this_DNS_magGrad_c
+
+        return grad_c_DNS
+
+    def compute_DNS_grad_4thO(self):
+        '''4th Order gradients of c from DNS data'''
+
+        print('Computing DNS gradients...')
+
+        # create empty array
+        grad_c_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(2,self.Nx-2):
+            for m in range(2,self.Nx-2):
+                for n in range(2,self.Nx-2):
+                    this_DNS_gradX = (-self.c_data_np[l+2, m, n] + 8*self.c_data_np[l+1,m, n] - 8*self.c_data_np[l-1,m, n] + self.c_data_np[l-2, m, n])/(12 * self.delta_x)
+                    this_DNS_gradY = (-self.c_data_np[l, m+2, n] + 8*self.c_data_np[l,m+1, n] - 8*self.c_data_np[l,m-1, n] + self.c_data_np[l, m-2, n])/(12 * self.delta_x)
+                    this_DNS_gradZ = (-self.c_data_np[l, m, n+2] + 8*self.c_data_np[l,m, n+1] - 8*self.c_data_np[l,m, n-1] + self.c_data_np[l, m, n+2])/(12 * self.delta_x)
                     # compute the magnitude of the gradient
                     this_DNS_magGrad_c = np.sqrt(this_DNS_gradX**2 + this_DNS_gradY**2 + this_DNS_gradZ**2)
 
@@ -588,6 +603,29 @@ class data_binning_PDF(object):
                     this_LES_gradX = (self.c_filtered[l + 1, m, n] - self.c_filtered[l - 1, m, n]) / (2 * self.delta_x)
                     this_LES_gradY = (self.c_filtered[l, m + 1, n] - self.c_filtered[l, m - 1, n]) / (2 * self.delta_x)
                     this_LES_gradZ = (self.c_filtered[l, m, n + 1] - self.c_filtered[l, m, n - 1]) / (2 * self.delta_x)
+                    # compute the magnitude of the gradient
+                    this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
+
+                    self.grad_c_LES[l, m, n] = this_LES_magGrad_c
+
+        return self.grad_c_LES
+
+    def compute_LES_grad_4thO(self):
+        # computes the flame surface area in the DNS based on gradients of c of neighbour DNS cells
+        # 4th Order version
+
+        print('Computing LES gradients on DNS mesh ...')
+
+        # create empty array
+        self.grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+
+        # compute gradients from the boundaries away ...
+        for l in range(2, self.Nx - 2):
+            for m in range(2, self.Nx - 2):
+                for n in range(2, self.Nx - 2):
+                    this_LES_gradX = (-self.c_filtered[l + 2, m, n] + 8*self.c_filtered[l + 1, m, n] - 8*self.c_filtered[l - 1, m, n] + self.c_filtered[l - 2, m, n]) / (12 * self.delta_x)
+                    this_LES_gradY = (-self.c_filtered[l, m + 2, n] + 8*self.c_filtered[l, m+1, n] - 8*self.c_filtered[l, m-1, n] + self.c_filtered[l, m-2, n]) / (12 * self.delta_x)
+                    this_LES_gradZ = (-self.c_filtered[l, m, n+2] + 8*self.c_filtered[l, m, n+1] - 8*self.c_filtered[l, m, n-1] + self.c_filtered[l, m, n-2]) / (12 * self.delta_x)
                     # compute the magnitude of the gradient
                     this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
 
@@ -821,6 +859,18 @@ class data_binning_PDF(object):
 
         return grad_DNS_filtered
 
+    def compute_filter_DNS_grad_4thO(self):
+         # compute filtered DNS reaction rate
+         # create empty array
+         #grad_DNS_filtered = np.zeros([self.Nx, self.Nx, self.Nx])
+
+        # compute dask delayed object
+        grad_c_DNS = self.compute_DNS_grad_4thO()
+
+        grad_DNS_filtered = self.apply_filter(grad_c_DNS)
+
+        return grad_DNS_filtered
+
 
     def compute_filter_DNS_grad_reduced(self):
     # compute filtered DNS reaction rate
@@ -1018,6 +1068,9 @@ class data_binning_PDF(object):
     def compute_Pfitzner_model(self):
         '''
         computes the model values in sequential manner
+        :param self.omega_model_cbar: is the modeled omega from the laminar planar flame
+        :param self.omega_DNS: is the (real) omega field from the DNS data
+        :param self.omega_DNS_filtered: is the filtered omega field from DNS data; this is the bench mark to compare with
         '''
 
         # switch between the computation modes
@@ -1042,8 +1095,8 @@ class data_binning_PDF(object):
 
 
 
-
 # NEW CLASS FOR THE CLUSTER
+#TODO: Evtl wieder löschen...
 
 class data_binning_cluster(data_binning_PDF):
 
@@ -1248,7 +1301,7 @@ class data_binning_dirac(data_binning_PDF):
 
         # check if self.grad_c_DNS was computed, if not -> compute it
         if type(self.grad_c_DNS) is None:
-            self.compute_DNS_grad()
+            self.grad_c_DNS=self.compute_DNS_grad_4thO()
 
         # loop over the different c_iso values
         for id, c_iso in enumerate(self.c_iso_values):
@@ -1340,7 +1393,7 @@ class data_binning_dirac(data_binning_PDF):
         # self.get_wrinkling()
 
         # compute abs(grad(c)) on the whole DNS domaine
-        self.grad_c_DNS = self.compute_DNS_grad()
+        self.grad_c_DNS = self.compute_DNS_grad_4thO()
 
         # compute omega based on pfitzner
         self.compute_Pfitzner_model()
@@ -1729,6 +1782,10 @@ class data_binning_dirac_xi(data_binning_PDF):
 # NEW CLASS WITH PFITZNERS FSD FORMULATION FOR GENERALIZED WRINKLING FACTOR
 # SEE report from Pfitzner 12.2.2020
 
+#TODO: remove!
+# This version is OUTDATED
+# Check if it is a parent Class??
+
 class data_binning_dirac_FSD(data_binning_dirac_xi):
     # new implementation with numerical delta dirac function
 
@@ -1930,8 +1987,12 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
 
 
     def compute_omega_FSD(self):
-        # omega computation with FSD method according to Pfitzner
-        # omega_bar = \int_0^1 (m+1)*c_iso**m 1/Delta_LES**3 \int_cell \delta(\xi(x) - \xi_iso) dx dc_iso
+        '''
+        omega computation with FSD method according to Pfitzner
+        omega_bar = \int_0^1 (m+1)*c_iso**m 1/Delta_LES**3 \int_cell \delta(\xi(x) - \xi_iso) dx dc_iso
+        :return: NULL
+        :param self.omega_model_exact is the FSD omgea
+        '''
 
         print('Computing exact omega bar ...')
 
@@ -1951,13 +2012,9 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
         except AssertionError:
             print('omega_integrant shape', omega_integrated.shape)
 
-        # print('Compute cell sum of omega_integrated')
-        # # self.omega_model_exact=self.apply_filter(omega_integrated)
-        # self.omega_model_exact  = self.compute_LES_cell_sum(omega_integrated)/(self.Delta_LES**3)
-
-        # #ALTERNATIVE ???
+        # Works fast and is correct!
         print('Top Hat filtering to get omega_model_exact')
-        self.omega_model_exact  = self.apply_filter(omega_integrated)/(self.delta_x*self.Sc * self.Re * np.sqrt(self.p/self.p_0))**3
+        self.omega_model_exact  = self.apply_filter(omega_integrated)/(self.Delta_LES/self.filter_width)**3
 
         # ########################
         # # only temporary
@@ -1969,7 +2026,7 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
         # np.save(filename,self.dirac_xi_fields)
         # ########################
 
-        # free memory
+        # free some memory, field is not needed anymore case
         del self.dirac_xi_fields
 
 
@@ -2054,5 +2111,144 @@ class data_binning_dirac_FSD_alt(data_binning_dirac_xi):
         self.dataArray_df.to_csv(filename,index=False)
         print('Data has been written.\n\n')
 
+
+##################################################
+# implemented 17.3.20
+
+class data_binning_dirac_compare(data_binning_dirac_FSD_alt):
+    ''' compares the different Sigma computations
+        1. based on slices and convolution with corresponding \omega (FSD assumption)
+        2. based on c_iso = 0.85
+        3. based on c_iso = c_bar
+    '''
+
+    def __init__(self,case, bins, eps_factor,c_iso_values):
+        # extend super class with additional input parameters
+        super(data_binning_dirac_compare, self).__init__(case, bins, eps_factor,c_iso_values)
+
+        print('This is the version to compare the different Sigmas ...')
+
+
+    def compute_phi_c(self,c_iso):
+        '''
+        computes the difference between abs(c(x)-c_iso)
+        see Pfitzner notes Eq. 3
+        :param c_iso: np vector (1D np.array)
+        :return: 1D np.array
+        '''
+
+        c_data_vec = self.c_data_np.reshape(self.Nx**3)
+
+        return abs(c_data_vec - c_iso)
+
+
+    def compute_Xi_iso_dirac_c(self,c_iso):
+        '''
+
+        :param c_iso: 3D or 1D np.array
+        :return: 3D np.array of the Xi field
+        '''
+
+        # make sure c_iso is a vector!
+        if np.ndim(c_iso) > 1:
+            c_iso = c_iso.reshape(self.Nx**3)
+
+        # check if self.grad_c_DNS was computed, if not -> compute it
+        if type(self.grad_c_DNS) is None:
+            self.grad_c_DNS = self.compute_DNS_grad()
+
+        grad_c_DNS_vec = self.grad_c_DNS.reshape(self.Nx**3)
+
+        c_phi = self.compute_phi_c(c_iso)
+        dirac = self.compute_dirac_cos(c_phi)
+        dirac_times_grad_c_vec = (dirac * grad_c_DNS_vec)
+        # print('dirac_imes_grad_c: ', dirac_times_grad_c)
+
+        # convert from vector back to 3D array
+        dirac_times_grad_c_arr = dirac_times_grad_c_vec.reshape(self.Nx,self.Nx,self.Nx)
+
+        dirac_LES_filter = self.apply_filter(dirac_times_grad_c_arr) #self.compute_LES_cell_sum(dirac_times_grad_c_arr)
+
+        Xi_iso_filtered = dirac_LES_filter * (self.filter_width**3 / self.filter_width**2)  # Conversion to Xi-space!
+
+        return Xi_iso_filtered
+
+
+    def run_analysis_dirac_compare(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        # filter the c and rho field
+        print('Filtering c field ...')
+        self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        # 1st method
+        # compute omega_model_exact with FSD from Pfitzner
+        self.compute_omega_FSD()
+
+        # 2nd method
+        Xi_iso_085 = self.compute_Xi_iso_dirac_c(c_iso=0.85)
+
+        # 3rd method
+        Xi_iso_cbar = self.compute_Xi_iso_dirac_c(c_iso=self.c_filtered)
+
+        # 4th method
+        wrinkling_factor = self.get_wrinkling()
+
+        # print('write omega_DNS')
+        # filename = join(self.case,
+        #                 'filter_width_' + str(self.filter_width) + '_omega_DNS.npy')
+        # np.save(filename,self.omega_DNS)
+
+        # creat dask array and reshape all data
+        # a bit nasty for list in list as of variable c_iso values
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
+                                    self.omega_model_exact.reshape(self.Nx**3,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx**3,1)
+                                  ])
+
+        filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_FSD_xi_alt.csv')
+
+        self.dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=['c_bar','omega_model_exact','omega_DNS_filtered'])
+
+        # filter the data set and remove unecessary entries
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
+        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
+
+
+        print('Computing data array ...')
+        self.dataArray_df = self.dataArray_dd.sample(frac=0.3).compute()
+
+        print('Writing output to csv ...')
+        self.dataArray_df.to_csv(filename,index=False)
+        print('Data has been written.\n\n')
 
         
