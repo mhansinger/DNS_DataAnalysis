@@ -33,6 +33,7 @@ from scipy.integrate import simps
 
 
 class dns_analysis_base(object):
+    # Base class. To be inherited from
 
     def __init__(self, case):
         '''
@@ -62,7 +63,7 @@ class dns_analysis_base(object):
 
         if self.case is '1bar':
             # NUMBER OF DNS CELLS IN X,Y,Z DIRECTION
-            self.Nx = 250
+            self.Nx = self.Ny = self.Nz = 250
             # PARAMETER FOR REACTION RATE
             self.bfact = 7364.0
             # REYNOLDS NUMBER
@@ -75,7 +76,7 @@ class dns_analysis_base(object):
             beta=6
             alpha=0.81818
         elif self.case=='5bar':
-            self.Nx = 560
+            self.Nx = self.Ny = self.Nz = 560
             self.bfact = 7128.3
             self.Re = 892 # 500
             self.delta_x = 1/432
@@ -84,7 +85,7 @@ class dns_analysis_base(object):
             beta=6
             alpha=0.81818
         elif self.case=='10bar':
-            self.Nx = 795
+            self.Nx = self.Ny = self.Nz = 795
             self.bfact = 7128.3
             self.Re = 1262 #1000
             self.delta_x = 1/611
@@ -95,14 +96,14 @@ class dns_analysis_base(object):
         elif self.case is 'dummy_planar_flame':
             # this is a dummy case with 50x50x50 entries!
             print('\n################\nThis is the dummy test case!\n################\n')
-            self.Nx = 150
+            self.Nx = self.Ny = self.Nz = 150
             self.bfact = 7364.0
             self.Re = 100
             self.delta_x = 1/188
             self.p = 1
         elif self.case.startswith('NX512'):
             # check: Parameter_PlanarFlame.xlsx
-            self.Nx = 512
+            self.Nx = self.Ny = self.Nz = 512
             self.bfact = 3675
             self.Re = 50
             self.delta_x = 1/220    # Klein nochmal fragen! -> 220 stimmt!
@@ -113,7 +114,7 @@ class dns_analysis_base(object):
         elif self.case is 'planar_flame_test':
             # check: Parameter_PlanarFlame.xlsx
             print('\n################\nThis is the laminar planar test case!\n################\n')
-            self.Nx = 512
+            self.Nx = self.Ny = self.Nz = 512
             self.bfact = 3675
             self.Re = 50
             self.delta_x = 1/220
@@ -133,9 +134,9 @@ class dns_analysis_base(object):
         self.p_0 = 1
 
         # Variables for FILTERING
-        self.c_filtered = np.zeros((self.Nx,self.Nx,self.Nx))
-        #self.rho_filtered = np.zeros((self.Nx,self.Nx,self.Nx))
-        #self.c_filtered_clipped = np.zeros((self.Nx,self.Nx,self.Nx))       # c für wrinkling factor nur zw 0.75 und 0.85
+        self.c_filtered = np.zeros((self.Nx,self.Ny,self.Nz))
+        #self.rho_filtered = np.zeros((self.Nx,self.Ny,self.Nz))
+        #self.c_filtered_clipped = np.zeros((self.Nx,self.Ny,self.Nz))       # c für wrinkling factor nur zw 0.75 und 0.85
 
         # SCHMIDT NUMBER
         self.Sc = 0.7
@@ -175,7 +176,7 @@ class dns_analysis_base(object):
 
         try:
             c_data_vec = np.loadtxt(self.c_path)
-            self.c_data_np = c_data_vec.reshape(self.Nx,self.Nx,self.Nx)
+            self.c_data_np = c_data_vec.reshape(self.Nx,self.Ny,self.Nz)
 
         except OSError:
             print('c.dat not found, compute it from rho_c.dat and rho.dat')
@@ -191,8 +192,8 @@ class dns_analysis_base(object):
                 sys.exit('No data for rho')
 
             # transform the data into an array and reshape it to 3D
-            self.rho_data_np = self.data_rho.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
-            self.rho_c_data_np = self.data_rho_c.to_dask_array(lengths=True).reshape(self.Nx,self.Nx,self.Nx).compute()
+            self.rho_data_np = self.data_rho.to_dask_array(lengths=True).reshape(self.Nx,self.Ny,self.Nz).compute()
+            self.rho_c_data_np = self.data_rho_c.to_dask_array(lengths=True).reshape(self.Nx,self.Ny,self.Nz).compute()
 
             # progress variable
             self.c_data_np = self.rho_c_data_np / self.rho_data_np
@@ -214,7 +215,7 @@ class dns_analysis_base(object):
             print('Only np.ndarrays are allowed in Gauss_filter!')
 
         if len(data.shape) == 1:
-            data = data.reshape(self.Nx,self.Nx,self.Nx)
+            data = data.reshape(self.Nx,self.Ny,self.Nz)
 
 
         if self.filter_type == 'GAUSS':
@@ -280,12 +281,12 @@ class dns_analysis_base(object):
         print('Computing DNS gradients...')
 
         # create empty array
-        grad_c_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+        grad_c_DNS = np.zeros([self.Nx,self.Ny,self.Nz])
 
         # compute gradients from the boundaries away ...
-        for l in range(1,self.Nx-1):
-            for m in range(1,self.Nx-1):
-                for n in range(1,self.Nx-1):
+        for l in range(2,self.Nx-2):
+            for m in range(2,self.Ny-2):
+                for n in range(2,self.Nz-2):
                     this_DNS_gradX = (self.c_data_np[l+1, m, n] - self.c_data_np[l-1,m, n])/(2 * self.delta_x)
                     this_DNS_gradY = (self.c_data_np[l, m+1, n] - self.c_data_np[l, m-1, n]) / (2 * self.delta_x)
                     this_DNS_gradZ = (self.c_data_np[l, m, n+1]- self.c_data_np[l, m, n-1]) / (2 * self.delta_x)
@@ -306,12 +307,12 @@ class dns_analysis_base(object):
         print('Computing DNS gradients 4th Order...')
 
         # create empty array
-        grad_c_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+        grad_c_DNS = np.zeros([self.Nx,self.Ny,self.Nz])
 
         # compute gradients from the boundaries away ...
         for l in range(2,self.Nx-2):
-            for m in range(2,self.Nx-2):
-                for n in range(2,self.Nx-2):
+            for m in range(2,self.Ny-2):
+                for n in range(2,self.Nz-2):
                     this_DNS_gradX = (-self.c_data_np[l+2, m, n] + 8*self.c_data_np[l+1,m, n] - 8*self.c_data_np[l-1,m, n] + self.c_data_np[l-2, m, n])/(12 * self.delta_x)
                     this_DNS_gradY = (-self.c_data_np[l, m+2, n] + 8*self.c_data_np[l,m+1, n] - 8*self.c_data_np[l,m-1, n] + self.c_data_np[l, m-2, n])/(12 * self.delta_x)
                     this_DNS_gradZ = (-self.c_data_np[l, m, n+2] + 8*self.c_data_np[l,m, n+1] - 8*self.c_data_np[l,m, n-1] + self.c_data_np[l, m, n+2])/(12 * self.delta_x)
@@ -331,7 +332,7 @@ class dns_analysis_base(object):
         # print('Computing DNS gradients for c reduced...')
         #
         # # create empty array
-        # grad_c_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+        # grad_c_DNS = np.zeros([self.Nx,self.Ny,self.Nz])
         #
         # # compute gradients from the boundaries away ...
         # for l in range(1,self.Nx-1):
@@ -359,12 +360,12 @@ class dns_analysis_base(object):
         print('Computing LES gradients on DNS mesh ...')
 
         # create empty array
-        self.grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+        self.grad_c_LES = np.zeros([self.Nx, self.Ny, self.Nz])
 
         # compute gradients from the boundaries away ...
-        for l in range(1, self.Nx - 1):
-            for m in range(1, self.Nx - 1):
-                for n in range(1, self.Nx - 1):
+        for l in range(2,self.Nx-2):
+            for m in range(2,self.Ny-2):
+                for n in range(2,self.Nz-2):
                     this_LES_gradX = (self.c_filtered[l + 1, m, n] - self.c_filtered[l - 1, m, n]) / (2 * self.delta_x)
                     this_LES_gradY = (self.c_filtered[l, m + 1, n] - self.c_filtered[l, m - 1, n]) / (2 * self.delta_x)
                     this_LES_gradZ = (self.c_filtered[l, m, n + 1] - self.c_filtered[l, m, n - 1]) / (2 * self.delta_x)
@@ -385,12 +386,12 @@ class dns_analysis_base(object):
         print('Computing LES 4th order gradients on DNS mesh ...')
 
         # create empty array
-        self.grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+        self.grad_c_LES = np.zeros([self.Nx, self.Ny, self.Nz])
 
         # compute gradients from the boundaries away ...
         for l in range(2, self.Nx - 2):
-            for m in range(2, self.Nx - 2):
-                for n in range(2, self.Nx - 2):
+            for m in range(2, self.Ny - 2):
+                for n in range(2, self.Nz - 2):
                     this_LES_gradX = (-self.c_filtered[l + 2, m, n] + 8*self.c_filtered[l + 1, m, n] - 8*self.c_filtered[l - 1, m, n] + self.c_filtered[l - 2, m, n]) / (12 * self.delta_x)
                     this_LES_gradY = (-self.c_filtered[l, m + 2, n] + 8*self.c_filtered[l, m+1, n] - 8*self.c_filtered[l, m-1, n] + self.c_filtered[l, m-2, n]) / (12 * self.delta_x)
                     this_LES_gradZ = (-self.c_filtered[l, m, n+2] + 8*self.c_filtered[l, m, n+1] - 8*self.c_filtered[l, m, n-1] + self.c_filtered[l, m, n-2]) / (12 * self.delta_x)
@@ -408,7 +409,7 @@ class dns_analysis_base(object):
         # print('Computing LES gradients on DNS mesh for c reduced ...')
         #
         # # create empty array
-        # self.grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+        # self.grad_c_LES = np.zeros([self.Nx, self.Ny, self.Nz])
         #
         # # compute gradients from the boundaries away ...
         # for l in range(1, self.Nx - 1):
@@ -436,12 +437,12 @@ class dns_analysis_base(object):
         print('Computing LES gradients on LES mesh ...')
 
         # create empty array
-        self.grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+        self.grad_c_LES = np.zeros([self.Nx, self.Ny, self.Nz])
 
         # compute gradients from the boundaries away ...
         for l in range(self.filter_width, self.Nx - self.filter_width):
-            for m in range(self.filter_width, self.Nx - self.filter_width):
-                for n in range(self.filter_width, self.Nx - self.filter_width):
+            for m in range(self.filter_width, self.Ny - self.filter_width):
+                for n in range(self.filter_width, self.Nz - self.filter_width):
                     this_LES_gradX = (self.c_filtered[l + self.filter_width, m, n] - self.c_filtered[l - self.filter_width, m, n]) / (2 * self.delta_x * self.filter_width)
                     this_LES_gradY = (self.c_filtered[l, m + self.filter_width, n] - self.c_filtered[l, m - self.filter_width, n]) / (2 * self.delta_x * self.filter_width)
                     this_LES_gradZ = (self.c_filtered[l, m, n + self.filter_width] - self.c_filtered[l, m, n - self.filter_width]) / (2 * self.delta_x * self.filter_width)
@@ -459,7 +460,7 @@ class dns_analysis_base(object):
         # print('Computing LES gradients on LES mesh ...')
         #
         # # create empty array
-        # self.grad_c_LES = np.zeros([self.Nx, self.Nx, self.Nx])
+        # self.grad_c_LES = np.zeros([self.Nx, self.Ny, self.Nz])
         #
         # # compute gradients from the boundaries away ...
         # for l in range(self.filter_width, self.Nx - self.filter_width):
@@ -495,11 +496,11 @@ class dns_analysis_base(object):
         # progress bar
         bar = ChargingBar('Processing', max=iterpoints)
 
-        isoArea_coefficient = np.zeros((self.Nx,self.Nx,self.Nx))
+        isoArea_coefficient = np.zeros((self.Nx,self.Ny,self.Nz))
 
         for l in range(half_filter, self.Nx - half_filter, self.every_nth):
-            for m in range(half_filter, self.Nx - half_filter, self.every_nth):
-                for n in range(half_filter, self.Nx - half_filter, self.every_nth):
+            for m in range(half_filter, self.Ny - half_filter, self.every_nth):
+                for n in range(half_filter, self.Nz - half_filter, self.every_nth):
 
                     this_LES_box = (self.c_data_np[l-half_filter : l+half_filter,
                                                   m-half_filter : m+half_filter,
@@ -542,11 +543,11 @@ class dns_analysis_base(object):
         # progress bar
         bar = ChargingBar('Processing', max=iterpoints)
 
-        isoArea_coefficient = np.zeros((self.Nx,self.Nx,self.Nx))
+        isoArea_coefficient = np.zeros((self.Nx,self.Ny,self.Nz))
 
         for l in range(half_filter, self.Nx - half_filter, self.every_nth):
-            for m in range(half_filter, self.Nx - half_filter, self.every_nth):
-                for n in range(half_filter, self.Nx - half_filter, self.every_nth):
+            for m in range(half_filter, self.Ny - half_filter, self.every_nth):
+                for n in range(half_filter, self.Nz - half_filter, self.every_nth):
 
                     this_LES_box = (self.c_data_np[l-half_filter : l+half_filter,
                                                   m-half_filter : m+half_filter,
@@ -587,7 +588,7 @@ class dns_analysis_base(object):
 
         DNS_range = range(half_filter, self.Nx - half_filter)
 
-        isoArea_coefficient = np.zeros((self.Nx,self.Nx,self.Nx))
+        isoArea_coefficient = np.zeros((self.Nx,self.Ny,self.Nz))
 
         isoArea_list = Parallel(n_jobs=4)(delayed(self.compute_this_LES_box)(l,m,n, half_filter,c_iso,isoArea_coefficient)
                            for n in DNS_range
@@ -595,7 +596,7 @@ class dns_analysis_base(object):
                            for l in DNS_range)
 
         # reshape isoArea_list into 3D np.array
-        isoArea_coefficient = np.array(isoArea_list).reshape(self.Nx,self.Nx,self.Nx)
+        isoArea_coefficient = np.array(isoArea_list).reshape(self.Nx,self.Ny,self.Nz)
 
         return isoArea_coefficient
 
@@ -670,7 +671,7 @@ class dns_analysis_base(object):
 
         Lambda = 18.97
 
-        c_data_np_vector = self.c_data_np.reshape(self.Nx**3)
+        c_data_np_vector = self.c_data_np.reshape(self.Nx*self.Ny*self.Nz)
 
         # according to Pfitzner implementation
         exponent = - self.beta*(1 - c_data_np_vector) / (1 - self.alpha*(1 - c_data_np_vector))
@@ -679,7 +680,7 @@ class dns_analysis_base(object):
                                      * (1 - c_data_np_vector) * np.exp(exponent)
 
         # reshape it to 3D array
-        RR_DNS = this_RR_reshape_DNS_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
+        RR_DNS = this_RR_reshape_DNS_Pfitz.reshape(self.Nx,self.Ny,self.Nz)
 
         return RR_DNS
 
@@ -705,14 +706,14 @@ class dns_analysis_base(object):
         Lambda = 18.97
 
         # according to Pfitzner implementation
-        exponent = - self.beta*(1-self.c_filtered.reshape(self.Nx**3)) / (1 - self.alpha*(1 - self.c_filtered.reshape(self.Nx**3)))
-        #this_RR_reshape_DNS = self.bfact*self.rho_data_np.reshape(self.Nx**3)*(1-self.c_data_np.reshape(self.Nx**3))*np.exp(exponent)
+        exponent = - self.beta*(1-self.c_filtered.reshape(self.Nx*self.Ny*self.Nz)) / (1 - self.alpha*(1 - self.c_filtered.reshape(self.Nx*self.Ny*self.Nz)))
+        #this_RR_reshape_DNS = self.bfact*self.rho_data_np.reshape(self.Nx*self.Ny*self.Nz)*(1-self.c_data_np.reshape(self.Nx*self.Ny*self.Nz))*np.exp(exponent)
 
-        this_RR_reshape_LES_Pfitz  = Lambda * ((1 - self.alpha * (1 - self.c_data_np.reshape(self.Nx**3)))) ** (-1) \
-                                     * (1 - self.c_data_np.reshape(self.Nx**3)) * np.exp(exponent)
+        this_RR_reshape_LES_Pfitz  = Lambda * ((1 - self.alpha * (1 - self.c_data_np.reshape(self.Nx*self.Ny*self.Nz)))) ** (-1) \
+                                     * (1 - self.c_data_np.reshape(self.Nx*self.Ny*self.Nz)) * np.exp(exponent)
 
         # reshape it to 3D array
-        RR_LES = this_RR_reshape_LES_Pfitz.reshape(self.Nx,self.Nx,self.Nx)
+        RR_LES = this_RR_reshape_LES_Pfitz.reshape(self.Nx,self.Ny,self.Nz)
 
         return RR_LES
 
@@ -776,11 +777,11 @@ class dns_analysis_base(object):
         :return: nothing
         '''
 
-        # self.c_filtered.reshape(self.Nx**3) = c_bar in der ganzen domain als vector
-        this_s = self.compute_s(self.c_filtered.reshape(self.Nx**3))
+        # self.c_filtered.reshape(self.Nx*self.Ny*self.Nz) = c_bar in der ganzen domain als vector
+        this_s = self.compute_s(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz))
         this_delta_0 = self.compute_delta_0(this_s)
 
-        self.c_minus = (np.exp(self.c_filtered.reshape(self.Nx**3)* this_delta_0 * self.Delta_LES) - 1) / \
+        self.c_minus = (np.exp(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz)* this_delta_0 * self.Delta_LES) - 1) / \
                        (np.exp(this_delta_0 * self.Delta_LES) - 1)
 
 
@@ -810,8 +811,8 @@ class dns_analysis_base(object):
         f_c_plus = interpolate.interp1d(c_bar_dummy, c_plus_dummy, fill_value="extrapolate")
 
         # update c_minus and c_plus
-        self.c_minus = f_c_minus(self.c_filtered.reshape(self.Nx**3))
-        self.c_plus = f_c_plus(self.c_filtered.reshape(self.Nx ** 3))
+        self.c_minus = f_c_minus(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz))
+        self.c_plus = f_c_plus(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz))
 
 
     def I_1(self,c):
@@ -847,7 +848,7 @@ class dns_analysis_base(object):
         omega_cbar = ((self.c_plus ** (self.m + 1) - self.c_minus ** (self.m + 1)) / self.Delta_LES)
 
         # reshape to 3D array
-        return omega_cbar.reshape(self.Nx,self.Nx,self.Nx)
+        return omega_cbar.reshape(self.Nx,self.Ny,self.Nz)
 
 
     def model_omega(self,c):
@@ -900,11 +901,11 @@ class dns_analysis_base(object):
 
         self.omega_model_cbar = self.compute_model_omega_bar()
 
-        #self.omega_model_cbar = self.model_omega(self.c_filtered.reshape(self.Nx**3))
-        self.omega_DNS = self.analytical_omega(self.c_data_np.reshape(self.Nx**3))
+        #self.omega_model_cbar = self.model_omega(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz))
+        self.omega_DNS = self.analytical_omega(self.c_data_np.reshape(self.Nx*self.Ny*self.Nz))
 
         if len(self.omega_DNS.shape) == 1:
-            self.omega_DNS = self.omega_DNS.reshape(self.Nx,self.Nx,self.Nx)
+            self.omega_DNS = self.omega_DNS.reshape(self.Nx,self.Ny,self.Nz)
 
         # filter the DNS reaction rate
         print('Filtering omega DNS ...')
@@ -985,11 +986,11 @@ class dns_analysis_wrinkling(dns_analysis_base):
             om_wrinkl = self.omega_model_cbar*self.wrinkling_factor
 
             pd.DataFrame(data=np.hstack([
-                                self.omega_DNS.reshape(self.Nx**3,1),
-                                self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                                om_iso.reshape(self.Nx**3,1),
-                                om_wrinkl.reshape(self.Nx**3,1),
-                                self.c_filtered.reshape(self.Nx ** 3, 1)]),
+                                self.omega_DNS.reshape(self.Nx*self.Ny*self.Nz,1),
+                                self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                om_iso.reshape(self.Nx*self.Ny*self.Nz,1),
+                                om_wrinkl.reshape(self.Nx*self.Ny*self.Nz,1),
+                                self.c_filtered.reshape(self.Nx*self.Ny*self.Nz, 1)]),
                                 columns=['omega_DNS',
                                         'omega_filtered',
                                         'omega_model_by_isoArea',
@@ -997,13 +998,13 @@ class dns_analysis_wrinkling(dns_analysis_base):
                                         'c_bar']).to_csv(filename)
 
         # creat dask array and reshape all data
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                   self.wrinkling_factor.reshape(self.Nx**3,1),
-                                   isoArea_coefficient.reshape(self.Nx**3,1),
-                                   self.omega_model_cbar.reshape(self.Nx**3,1),
-                                   self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                                   self.c_plus.reshape(self.Nx**3,1),
-                                   self.c_minus.reshape(self.Nx**3,1)])
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.wrinkling_factor.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   isoArea_coefficient.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.c_plus.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.c_minus.reshape(self.Nx*self.Ny*self.Nz,1)])
 
 
         if self.c_analytical is True:
@@ -1118,11 +1119,11 @@ class dns_analysis_cluster(dns_analysis_base):
             om_iso = self.omega_model_cbar*isoArea_coefficient
             om_wrinkl = self.omega_model_cbar*self.wrinkling_factor
 
-            pd.DataFrame(data=np.hstack([self.omega_DNS.reshape(self.Nx**3,1),
-                               self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                               om_iso.reshape(self.Nx**3,1),
-                               om_wrinkl.reshape(self.Nx**3,1),
-                               self.c_filtered.reshape(self.Nx ** 3, 1)]),
+            pd.DataFrame(data=np.hstack([self.omega_DNS.reshape(self.Nx*self.Ny*self.Nz,1),
+                               self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                               om_iso.reshape(self.Nx*self.Ny*self.Nz,1),
+                               om_wrinkl.reshape(self.Nx*self.Ny*self.Nz,1),
+                               self.c_filtered.reshape(self.Nx*self.Ny*self.Nz, 1)]),
                                columns=['omega_DNS',
                                         'omega_filtered',
                                         'omega_model_by_isoArea',
@@ -1131,17 +1132,17 @@ class dns_analysis_cluster(dns_analysis_base):
 
 
         # creat dask array and reshape all data
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                   self.wrinkling_factor.reshape(self.Nx**3,1),
-                                   isoArea_coefficient.reshape(self.Nx**3,1),
-                                   # self.wrinkling_factor_LES.reshape(self.Nx ** 3, 1),
-                                   # self.wrinkling_factor_reduced.reshape(self.Nx ** 3, 1),
-                                   # self.wrinkling_factor_LES_reduced.reshape(self.Nx ** 3, 1),
-                                   self.omega_model_cbar.reshape(self.Nx**3,1),
-                                   self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                                   #self.omega_LES_noModel.reshape(self.Nx**3,1),
-                                   self.c_plus.reshape(self.Nx**3,1),
-                                   self.c_minus.reshape(self.Nx**3,1)])
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.wrinkling_factor.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   isoArea_coefficient.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   # self.wrinkling_factor_LES.reshape(self.Nx*self.Ny*self.Nz, 1),
+                                   # self.wrinkling_factor_reduced.reshape(self.Nx*self.Ny*self.Nz, 1),
+                                   # self.wrinkling_factor_LES_reduced.reshape(self.Nx*self.Ny*self.Nz, 1),
+                                   self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   #self.omega_LES_noModel.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.c_plus.reshape(self.Nx*self.Ny*self.Nz,1),
+                                   self.c_minus.reshape(self.Nx*self.Ny*self.Nz,1)])
 
 
         if self.c_analytical is True:
@@ -1208,7 +1209,7 @@ class dns_analysis_dirac(dns_analysis_base):
         self.c_iso_values = c_iso_values
         self.eps_factor = eps_factor
         # the convolution of dirac x grad_c at all relevant iso values and LES filtered will be stored here
-        self.Xi_iso_filtered = np.zeros((self.Nx,self.Nx,self.Nx,len(self.c_iso_values)))
+        self.Xi_iso_filtered = np.zeros((self.Nx,self.Ny,self.Nz,len(self.c_iso_values)))
 
         print('You are using the Dirac version...')
 
@@ -1230,7 +1231,7 @@ class dns_analysis_dirac(dns_analysis_base):
         X = c_phi/eps
 
         # transform to vector
-        X_vec = X.reshape(self.Nx**3)
+        X_vec = X.reshape(self.Nx*self.Ny*self.Nz)
 
         dirac_vec = np.zeros(len(X_vec))
 
@@ -1241,7 +1242,7 @@ class dns_analysis_dirac(dns_analysis_base):
                 #print('dirac_vec: ',dirac_vec[id])
 
         # reshape to 3D array
-        dirac_array = dirac_vec.reshape(self.Nx,self.Nx,self.Nx)
+        dirac_array = dirac_vec.reshape(self.Nx,self.Ny,self.Nz)
 
         return dirac_array
 
@@ -1257,7 +1258,7 @@ class dns_analysis_dirac(dns_analysis_base):
 
             c_phi = self.compute_phi_c(c_iso)
             dirac = self.compute_dirac_cos(c_phi)
-            self.dirac_times_grad_c = (dirac * self.grad_c_DNS).reshape(self.Nx,self.Nx,self.Nx)
+            self.dirac_times_grad_c = (dirac * self.grad_c_DNS).reshape(self.Nx,self.Ny,self.Nz)
             print('dirac_imes_grad_c: ', self.dirac_times_grad_c)
 
             # check if integral is 1 for arbitrary
@@ -1277,8 +1278,8 @@ class dns_analysis_dirac(dns_analysis_base):
 
             if c_iso == 0.5:
                 #self.dirac_times_grad_c_085 = dirac_times_grad_c
-                self.grad_c_05 = self.grad_c_DNS.reshape(self.Nx,self.Nx,self.Nx)
-                self.dirac_05 = dirac.reshape(self.Nx,self.Nx,self.Nx)
+                self.grad_c_05 = self.grad_c_DNS.reshape(self.Nx,self.Ny,self.Nz)
+                self.dirac_05 = dirac.reshape(self.Nx,self.Ny,self.Nz)
 
             # TODO: check if that is correct!
             dirac_LES_sums = self.compute_LES_cell_sum(self.dirac_times_grad_c)
@@ -1373,12 +1374,12 @@ class dns_analysis_dirac(dns_analysis_base):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                    self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx**3,1),
-                                    self.omega_model_cbar.reshape(self.Nx**3,1),
-                                    self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                                    self.grad_c_05.reshape(self.Nx**3,1),
-                                    self.dirac_05.reshape(self.Nx ** 3, 1)
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.grad_c_05.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.dirac_05.reshape(self.Nx*self.Ny*self.Nz, 1)
                                   ])
 
         filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_dirac.csv')
@@ -1433,7 +1434,7 @@ class dns_analysis_dirac_xi(dns_analysis_base):
         self.c_iso_values = c_iso_values
         self.eps_factor = eps_factor
         # the convolution of dirac x grad_c at all relevant iso values and LES filtered will be stored here
-        self.Xi_iso_filtered = np.zeros((self.Nx,self.Nx,self.Nx,len(self.c_iso_values)))
+        self.Xi_iso_filtered = np.zeros((self.Nx,self.Ny,self.Nz,len(self.c_iso_values)))
 
         self.xi_np = None        # to be filled
         self.xi_iso_values = None   # converted c_iso_values into xi-space
@@ -1469,7 +1470,7 @@ class dns_analysis_dirac_xi(dns_analysis_base):
         X = xi_phi/eps
 
         # transform to vector
-        X_vec = X.reshape(self.Nx**3)
+        X_vec = X.reshape(self.Nx*self.Ny*self.Nz)
 
         dirac_vec = np.zeros(len(X_vec))
 
@@ -1479,7 +1480,7 @@ class dns_analysis_dirac_xi(dns_analysis_base):
                 dirac_vec[id] =1/(2*eps) * (1 + np.cos(np.pi * x)) * self.delta_x
                 #print('dirac_vec: ',dirac_vec[id])
 
-        dirac_array = dirac_vec.reshape(self.Nx,self.Nx,self.Nx)
+        dirac_array = dirac_vec.reshape(self.Nx,self.Ny,self.Nz)
 
         return dirac_array
 
@@ -1495,7 +1496,7 @@ class dns_analysis_dirac_xi(dns_analysis_base):
 
             xi_phi = self.compute_phi_xi(xi_iso)
             dirac_xi = self.compute_dirac_cos(xi_phi)
-            self.dirac_times_grad_xi = (dirac_xi * self.grad_xi_DNS).reshape(self.Nx,self.Nx,self.Nx)
+            self.dirac_times_grad_xi = (dirac_xi * self.grad_xi_DNS).reshape(self.Nx,self.Ny,self.Nz)
             #print('dirac_times_grad_xi: ', self.dirac_times_grad_xi)
 
             # check if integral is 1 for arbitrary
@@ -1515,8 +1516,8 @@ class dns_analysis_dirac_xi(dns_analysis_base):
 
             #if xi_iso == 0.85:
             #self.dirac_times_grad_c_085 = dirac_times_grad_c
-            self.grad_c_05 = self.grad_xi_DNS.reshape(self.Nx,self.Nx,self.Nx)
-            self.dirac_05 = dirac_xi.reshape(self.Nx,self.Nx,self.Nx)
+            self.grad_c_05 = self.grad_xi_DNS.reshape(self.Nx,self.Ny,self.Nz)
+            self.dirac_05 = dirac_xi.reshape(self.Nx,self.Ny,self.Nz)
 
             # TODO: check if that is correct!
             dirac_LES_sums = self.compute_LES_cell_sum(self.dirac_times_grad_xi)
@@ -1573,12 +1574,12 @@ class dns_analysis_dirac_xi(dns_analysis_base):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                    self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx**3,1),
-                                    self.omega_model_cbar.reshape(self.Nx**3,1),
-                                    self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                                    #self.grad_c_05.reshape(self.Nx**3,1),
-                                    #self.dirac_05.reshape(self.Nx ** 3, 1)
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    #self.grad_c_05.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    #self.dirac_05.reshape(self.Nx*self.Ny*self.Nz, 1)
                                   ])
 
         filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_dirac_xi.csv')
@@ -1652,7 +1653,7 @@ class dns_analysis_dirac_xi(dns_analysis_base):
             self.convert_to_xi()
 
         # create empty array
-        grad_xi_DNS = np.zeros([self.Nx,self.Nx,self.Nx])
+        grad_xi_DNS = np.zeros([self.Nx,self.Ny,self.Nz])
 
         # compute gradients from the boundaries away ...
         for l in range(1,self.Nx-1):
@@ -1696,10 +1697,10 @@ class dns_analysis_dirac_FSD(dns_analysis_dirac_xi):
         self.N_c_iso = len(self.c_iso_values)
 
         # this is a 4D array to store all dirac values for the different c_iso values
-        self.dirac_xi_fields = np.zeros([self.N_c_iso,self.Nx,self.Nx,self.Nx])
+        self.dirac_xi_fields = np.zeros([self.N_c_iso,self.Nx,self.Ny,self.Nz])
 
         # set up a new omega_bar field to store the exact solution from the pdf...no real name yet
-        self.omega_model_exact = np.zeros([self.Nx,self.Nx,self.Nx])
+        self.omega_model_exact = np.zeros([self.Nx,self.Ny,self.Nz])
 
         #print('You are using the Dirac version...')
         print('You are using the new FSD routine...')
@@ -1804,9 +1805,9 @@ class dns_analysis_dirac_FSD(dns_analysis_dirac_xi):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                    self.omega_model_exact.reshape(self.Nx**3,1),
-                                    self.omega_DNS_filtered.reshape(self.Nx**3,1)
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.omega_model_exact.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1)
                                   ])
 
         filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_FSD_xi.csv')
@@ -1846,10 +1847,10 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
         self.N_c_iso = len(self.c_iso_values)
 
         # this is a 4D array to store all dirac values for the different c_iso values
-        self.dirac_xi_fields = np.zeros([self.N_c_iso,self.Nx,self.Nx,self.Nx])
+        self.dirac_xi_fields = np.zeros([self.N_c_iso,self.Nx,self.Ny,self.Nz])
 
         # set up a new omega_bar field to store the exact solution from the pdf...no real name yet
-        self.omega_model_exact = np.zeros([self.Nx,self.Nx,self.Nx])
+        self.omega_model_exact = np.zeros([self.Nx,self.Ny,self.Nz])
 
         print('You are using the new alternative FSD routine...')
 
@@ -1896,7 +1897,7 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
         omega_integrated = simps(self.dirac_xi_fields,self.c_iso_values,axis=0)
 
         try:
-            assert omega_integrated == (self.Nx,self.Nx,self.Nx)
+            assert omega_integrated == (self.Nx,self.Ny,self.Nz)
         except AssertionError:
             print('omega_integrant shape', omega_integrated.shape)
 
@@ -1926,7 +1927,7 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
         :return: 1D np.array
         '''
 
-        c_data_vec = self.c_data_np.reshape(self.Nx**3)
+        c_data_vec = self.c_data_np.reshape(self.Nx*self.Ny*self.Nz)
 
         return abs(c_data_vec - c_iso)
 
@@ -1940,22 +1941,22 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
 
         # make sure c_iso is a vector!
         if np.ndim(c_iso) > 1:
-            c_iso = c_iso.reshape(self.Nx**3)
+            c_iso = c_iso.reshape(self.Nx*self.Ny*self.Nz)
 
         # check if self.grad_c_DNS was computed, if not -> compute it
         if self.grad_c_DNS is None:
             self.grad_c_DNS = self.compute_DNS_grad_4thO()
 
-        grad_c_DNS_vec = self.grad_c_DNS.reshape(self.Nx**3)
+        grad_c_DNS_vec = self.grad_c_DNS.reshape(self.Nx*self.Ny*self.Nz)
 
         c_phi = self.compute_phi_c(c_iso)
         dirac = self.compute_dirac_cos(c_phi)
-        dirac_vec = dirac.reshape(self.Nx**3)
+        dirac_vec = dirac.reshape(self.Nx*self.Ny*self.Nz)
         dirac_times_grad_c_vec = (dirac_vec * grad_c_DNS_vec)
         # print('dirac_imes_grad_c: ', dirac_times_grad_c)
 
         # convert from vector back to 3D array
-        dirac_times_grad_c_arr = dirac_times_grad_c_vec.reshape(self.Nx,self.Nx,self.Nx)
+        dirac_times_grad_c_arr = dirac_times_grad_c_vec.reshape(self.Nx,self.Ny,self.Nz)
 
         dirac_LES_filter = self.apply_filter(dirac_times_grad_c_arr) #self.compute_LES_cell_sum(dirac_times_grad_c_arr)
 
@@ -2005,9 +2006,9 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                    self.omega_model_exact.reshape(self.Nx**3,1),
-                                    self.omega_DNS_filtered.reshape(self.Nx**3,1)
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.omega_model_exact.reshape(self.Nx*self.Ny*self.Nz,1),
+                                    self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1)
                                   ])
 
         filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_FSD_xi_alt.csv')
@@ -2094,13 +2095,13 @@ class dns_analysis_dirac_compare(dns_analysis_dirac_FSD_alt):
         self.get_wrinkling(order='4th')
 
         # prepare data for output to csv file
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                  self.omega_model_exact.reshape(self.Nx**3,1),
-                                  self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                                  self.omega_model_cbar.reshape(self.Nx**3,1),
-                                  Xi_iso_085.reshape(self.Nx**3,1),
-                                  Xi_iso_cbar.reshape(self.Nx**3,1),
-                                  self.wrinkling_factor.reshape(self.Nx**3,1)
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.omega_model_exact.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  Xi_iso_085.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  Xi_iso_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.wrinkling_factor.reshape(self.Nx*self.Ny*self.Nz,1)
                                   ])
 
         filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_compare.csv')
@@ -2154,6 +2155,10 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
 
         self.c_data_np = np.load(self.c_path+'.npy')
 
+        self.Nx = self.c_data_np.shape[0]
+        self.Ny = self.c_data_np.shape[1]
+        self.Nz = self.c_data_np.shape[2]
+
         print('Shape of c_data_np: ',self.c_data_np.shape)
 
     def run_analysis_dirac_40slices(self,filter_width ,filter_type, c_analytical=False):
@@ -2206,25 +2211,22 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
         # self.get_wrinkling(order='4th')
 
         # prepare data for output to csv file
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx**3,1),
-                                  self.omega_model_exact.reshape(self.Nx**3,1),
-                                  self.omega_DNS_filtered.reshape(self.Nx**3,1),
-                                  self.omega_model_cbar.reshape(self.Nx**3,1),
-                                  Xi_iso_085.reshape(self.Nx**3,1),
-                                  Xi_iso_cbar.reshape(self.Nx**3,1),
-                                  self.wrinkling_factor.reshape(self.Nx**3,1)
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  #self.omega_model_exact.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  Xi_iso_085.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  #Xi_iso_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  #self.wrinkling_factor.reshape(self.Nx*self.Ny*self.Nz,1)
                                   ])
 
         filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_compare.csv')
 
         self.dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=
                                                   ['c_bar',
-                                                   'omega_model_FSD',
                                                    'omega_DNS_filtered',
                                                    'omega_model_planar',
-                                                   'Xi_iso_085',
-                                                   'Xi_iso_cbar',
-                                                   'wrinkling_factor'
+                                                   'Xi_iso_085'
                                                    ])
 
         # filter the data set and remove unecessary entries
@@ -2232,7 +2234,7 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
         self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
 
         print('Computing data array ...')
-        self.dataArray_df = self.dataArray_dd.sample(frac=0.3).compute()
+        self.dataArray_df = self.dataArray_dd.sample(frac=1.0).compute()
 
         print('Writing output to csv ...')
         self.dataArray_df.to_csv(filename,index=False)
