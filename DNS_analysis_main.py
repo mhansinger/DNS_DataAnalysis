@@ -1304,13 +1304,15 @@ class dns_analysis_dirac(dns_analysis_base):
 
         output_array = copy.copy(input_array)
 
+        # print('\noutput_array.shape: ',output_array.shape)
+
         output_array *= 0.0                 # set output array to zero
 
         half_filter = int(self.filter_width / 2)
 
         for l in range(half_filter, self.Nx - half_filter, 1):
-            for m in range(half_filter, self.Nx - half_filter, 1):
-                for n in range(half_filter, self.Nx - half_filter, 1):
+            for m in range(half_filter, self.Ny - half_filter, 1):
+                for n in range(half_filter, self.Nz - half_filter, 1):
 
                     this_LES_box = (input_array[l - half_filter: l + half_filter,
                                     m - half_filter: m + half_filter,
@@ -1422,7 +1424,7 @@ class dns_analysis_dirac(dns_analysis_base):
 # NEW CLASS WITH PFITZNERS WRINKLING FACTOR
 # THEREs a difference between xi and Xi!!! see the paper...
 
-class dns_analysis_dirac_xi(dns_analysis_base):
+class dns_analysis_dirac_xi(dns_analysis_dirac):
     '''
     computes the numerical delta function in xi space instead of c-space
     --> more accurate!
@@ -1444,7 +1446,10 @@ class dns_analysis_dirac_xi(dns_analysis_base):
         print('You are using the Dirac version...')
 
     def convert_to_xi(self):
-        # converts the c-field to the xi field (Eq. 13, Pfitzner)
+        '''
+        converts the c-field to the xi field (Eq. 13, Pfitzner, FTC, 2019)
+        :return:
+        '''
 
         c_clipped = self.c_data_np*0.9999 + 1e-5
 
@@ -1506,18 +1511,18 @@ class dns_analysis_dirac_xi(dns_analysis_base):
             # print(np.trapz(dirac_times_grad_c[250, :, 250]))
             print(np.trapz(self.dirac_times_grad_xi[250, 250, :]))
 
-            # save the line
-            output_df = pd.DataFrame(data=np.vstack([self.dirac_times_grad_xi[250, 250, :],
-                                                    xi_phi[250,250,:],
-                                                    dirac_xi[250, 250, :],
-                                                    self.xi_np[250,250,:]]).transpose(),
-                                     columns=['dirac_grad_xi','xi_phi','dirac_xi','xi'])
-            output_df.to_csv(join(self.case, '1D_data_cube.csv'))
+            # # save the line
+            # output_df = pd.DataFrame(data=np.vstack([self.dirac_times_grad_xi[250, 250, :],
+            #                                         xi_phi[250,250,:],
+            #                                         dirac_xi[250, 250, :],
+            #                                         self.xi_np[250,250,:]]).transpose(),
+            #                          columns=['dirac_grad_xi','xi_phi','dirac_xi','xi'])
+            # output_df.to_csv(join(self.case, '1D_data_cube.csv'))
 
-            #if xi_iso == 0.85:
-            #self.dirac_times_grad_c_085 = dirac_times_grad_c
-            self.grad_c_05 = self.grad_xi_DNS.reshape(self.Nx,self.Ny,self.Nz)
-            self.dirac_05 = dirac_xi.reshape(self.Nx,self.Ny,self.Nz)
+            # #if xi_iso == 0.85:
+            # #self.dirac_times_grad_c_085 = dirac_times_grad_c
+            # self.grad_c_05 = self.grad_xi_DNS.reshape(self.Nx,self.Ny,self.Nz)
+            # self.dirac_05 = dirac_xi.reshape(self.Nx,self.Ny,self.Nz)
 
             # TODO: check if that is correct!
             dirac_LES_sums = self.compute_LES_cell_sum(self.dirac_times_grad_xi)
@@ -1614,39 +1619,42 @@ class dns_analysis_dirac_xi(dns_analysis_base):
         print('Data has been written.\n\n')
 
 
-    def compute_LES_cell_sum(self,input_array):
-        # get the sum of values inside an LES cell
-        print('computing cell sum...')
-
-        try:
-            assert len(input_array.shape) == 3
-        except AssertionError:
-            print('input array must be 3D!')
-
-        output_array = copy.copy(input_array)
-
-        output_array *= 0.0                 # set output array to zero
-
-        half_filter = int(self.filter_width / 2)
-
-        for l in range(half_filter, self.Nx - half_filter, 1):
-            for m in range(half_filter, self.Nx - half_filter, 1):
-                for n in range(half_filter, self.Nx - half_filter, 1):
-
-                    this_LES_box = (input_array[l - half_filter: l + half_filter,
-                                    m - half_filter: m + half_filter,
-                                    n - half_filter: n + half_filter])
-
-                    # compute c_bar of current LES box
-                    output_array[l,m,n] = this_LES_box.sum()
-
-        return output_array
+    # def compute_LES_cell_sum(self,input_array):
+    #     # get the sum of values inside an LES cell
+    #     print('computing cell sum...')
+    #
+    #     try:
+    #         assert len(input_array.shape) == 3
+    #     except AssertionError:
+    #         print('input array must be 3D!')
+    #
+    #     output_array = copy.copy(input_array)
+    #
+    #     output_array *= 0.0                 # set output array to zero
+    #
+    #     half_filter = int(self.filter_width / 2)
+    #
+    #     for l in range(half_filter, self.Nx - half_filter, 1):
+    #         for m in range(half_filter, self.Nx - half_filter, 1):
+    #             for n in range(half_filter, self.Nx - half_filter, 1):
+    #
+    #                 this_LES_box = (input_array[l - half_filter: l + half_filter,
+    #                                 m - half_filter: m + half_filter,
+    #                                 n - half_filter: n + half_filter])
+    #
+    #                 # compute c_bar of current LES box
+    #                 output_array[l,m,n] = this_LES_box.sum()
+    #
+    #     return output_array
 
     def compute_DNS_grad_xi(self):
-        # computes the flame surface area in the DNS based on gradients of xi of neighbour cells
-        # magnitude of the gradient: abs(grad(c))
+        '''
+        computes the flame surface area in the DNS based on gradients of xi of neighbour cells
+        magnitude of the gradient:
+        :return: abs(grad(Xi))
+        '''
 
-        print('Computing DNS gradients in xi space...')
+        print('Computing DNS gradients in xi space 2nd Order ...')
 
         # check if self.xi_np is filled
         if self.xi_np is None:
@@ -1657,8 +1665,8 @@ class dns_analysis_dirac_xi(dns_analysis_base):
 
         # compute gradients from the boundaries away ...
         for l in range(1,self.Nx-1):
-            for m in range(1,self.Nx-1):
-                for n in range(1,self.Nx-1):
+            for m in range(1,self.Ny-1):
+                for n in range(1,self.Nz-1):
                     this_DNS_gradX = (self.xi_np[l+1, m, n] - self.xi_np[l-1,m, n])/(2 * self.delta_x)
                     this_DNS_gradY = (self.xi_np[l, m+1, n] - self.xi_np[l, m-1, n]) / (2 * self.delta_x)
                     this_DNS_gradZ = (self.xi_np[l, m, n+1] - self.xi_np[l, m, n-1]) / (2 * self.delta_x)
@@ -1952,7 +1960,10 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
         c_phi = self.compute_phi_c(c_iso)
         dirac = self.compute_dirac_cos(c_phi)
         dirac_vec = dirac.reshape(self.Nx*self.Ny*self.Nz)
+
         dirac_times_grad_c_vec = (dirac_vec * grad_c_DNS_vec)
+
+        #################################
         # print('dirac_imes_grad_c: ', dirac_times_grad_c)
 
         # convert from vector back to 3D array
@@ -1961,6 +1972,10 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
         dirac_LES_filter = self.apply_filter(dirac_times_grad_c_arr) #self.compute_LES_cell_sum(dirac_times_grad_c_arr)
 
         Xi_iso_filtered = dirac_LES_filter * (self.filter_width**3 / self.filter_width**2)  # Conversion to Xi-space!
+
+        # dirac_LES_sums = self.compute_LES_cell_sum(self.dirac_times_grad_xi)
+        # self.Xi_iso_filtered[:, :, :, id] = dirac_LES_sums / self.filter_width ** 2
+
 
         return Xi_iso_filtered
 
@@ -2161,6 +2176,9 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
 
         print('Shape of c_data_np: ',self.c_data_np.shape)
 
+        # setup new, as Nx is not same as Nz!
+        self.Xi_iso_filtered = np.zeros((self.Nx, self.Ny, self.Nz, len(self.c_iso_values)))
+
     def run_analysis_dirac_40slices(self,filter_width ,filter_type, c_analytical=False):
         '''
         :param filter_width: DNS points to filter
@@ -2229,12 +2247,91 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
                                                    'Xi_iso_085'
                                                    ])
 
-        # filter the data set and remove unecessary entries
-        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
-        self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
+        # # filter the data set and remove unecessary entries
+        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
+        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
 
         print('Computing data array ...')
-        self.dataArray_df = self.dataArray_dd.sample(frac=1.0).compute()
+        self.dataArray_df = self.dataArray_dd.compute()
+
+        print('Writing output to csv ...')
+        self.dataArray_df.to_csv(filename,index=False)
+        print('Data has been written.\n\n')
+
+    ###################
+    # TEST
+    ###################
+    def run_analysis_dirac_Xi(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        # filter the c and rho field
+        print('Filtering c field ...')
+        #self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+        # Set the Gauss kernel
+        self.set_gaussian_kernel()
+
+        # compute the wrinkling factor: NOT NEEDED here!
+        # self.get_wrinkling()
+
+        # compute abs(grad(c)) on the whole DNS domain
+        self.grad_xi_DNS = self.compute_DNS_grad_xi()
+
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        # compute Xi iso surface area for all c_iso values
+        self.compute_Xi_iso_dirac_xi()
+
+        # creat dask array and reshape all data
+        # a bit nasty for list in list as of variable c_iso values
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
+                                  ])
+
+        filename = join(self.case, 'filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_dirac_xi.csv')
+
+        self.dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=
+                                                  ['c_bar',
+                                                   'omega_DNS_filtered',
+                                                   'omega_model_planar',
+                                                   'Xi_iso_085'
+                                                   ])
+
+        # # filter the data set and remove unecessary entries
+        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] > 0.01]
+        # self.dataArray_dd = self.dataArray_dd[self.dataArray_dd['c_bar'] < 0.99]
+
+        print('Computing data array ...')
+        self.dataArray_df = self.dataArray_dd.compute()
 
         print('Writing output to csv ...')
         self.dataArray_df.to_csv(filename,index=False)
