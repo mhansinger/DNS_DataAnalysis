@@ -172,7 +172,7 @@ class dns_analysis_base(object):
         :return: nothing
         '''
 
-        print('Read in data...')
+        print('Reading in c-field data...')
 
         try:
             c_data_vec = np.loadtxt(self.c_path)
@@ -1445,7 +1445,7 @@ class dns_analysis_dirac_xi(dns_analysis_dirac):
 
         print('You are using the Dirac version...')
 
-    def convert_to_xi(self):
+    def convert_c_field_to_xi(self):
         '''
         converts the c-field to the xi field (Eq. 13, Pfitzner, FTC, 2019)
         :return:
@@ -1503,7 +1503,7 @@ class dns_analysis_dirac_xi(dns_analysis_dirac):
         return dirac_array
 
 
-    def compute_Xi_iso_dirac_xi(self):
+    def compute_Xi_iso_dirac_xi_old(self):
 
         # check if self.grad_c_DNS was computed, if not -> compute it
         if self.grad_xi_DNS is None:
@@ -1575,7 +1575,7 @@ class dns_analysis_dirac_xi(dns_analysis_dirac):
         self.compute_Pfitzner_model()
 
         # compute Xi iso surface area for all c_iso values
-        self.compute_Xi_iso_dirac_xi()
+        self.compute_Xi_iso_dirac_xi_old()
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
@@ -1658,7 +1658,7 @@ class dns_analysis_dirac_xi(dns_analysis_dirac):
 
         # check if self.xi_np is filled
         if self.xi_np is None:
-            self.convert_to_xi()
+            self.convert_c_field_to_xi()
 
         # create empty array
         grad_xi_DNS = np.zeros([self.Nx,self.Ny,self.Nz])
@@ -1688,7 +1688,7 @@ class dns_analysis_dirac_xi(dns_analysis_dirac):
 
         # check if self.xi_np is filled
         if self.xi_np is None:
-            self.convert_to_xi()
+            self.convert_c_field_to_xi()
 
         # create empty array
         grad_xi_DNS = np.zeros([self.Nx,self.Ny,self.Nz])
@@ -1754,7 +1754,7 @@ class dns_analysis_dirac_FSD(dns_analysis_dirac_xi):
 
         # compute the xi field
         # self.xi_np and self.xi_iso_values (from self.c_iso_values)
-        self.convert_to_xi()
+        self.convert_c_field_to_xi()
 
         # loop over the different c_iso values
         for id, xi_iso in enumerate(self.xi_iso_values):
@@ -1907,7 +1907,7 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
         :return:
         '''
 
-        self.convert_to_xi()
+        self.convert_c_field_to_xi()
 
         # loop over the different c_iso values
         for id, xi_iso in enumerate(self.xi_iso_values):
@@ -2013,10 +2013,10 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
         # dirac_LES_sums = self.compute_LES_cell_sum(self.dirac_times_grad_xi)
         # self.Xi_iso_filtered[:, :, :, id] = dirac_LES_sums / self.filter_width ** 2
 
-
         return Xi_iso_filtered
 
-    def compute_Xi_iso_dirac_xi_2(self,c_iso):
+
+    def compute_Xi_iso_dirac_xi(self,c_iso):
         '''
         use the filter function to get the cell integral of dirac values \int_\Omeaga
         :param c_iso: 3D or 1D np.array
@@ -2028,7 +2028,7 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
             c_iso = c_iso.reshape(self.Nx*self.Ny*self.Nz)
 
         # converts the c field to xi field: self.xi_np
-        self.convert_to_xi()
+        self.convert_c_field_to_xi()
 
         # compute xi_iso
         xi_iso = self.convert_c_to_xi(c=c_iso)
@@ -2051,7 +2051,7 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
 
         dirac_LES_filter = self.apply_filter(dirac_times_grad_xi_arr) #self.compute_LES_cell_sum(dirac_times_grad_c_arr)
 
-        Xi_iso_filtered = dirac_LES_filter * (self.filter_width**3 / self.filter_width**2)  # Conversion to Xi-space!
+        Xi_iso_filtered = dirac_LES_filter * (self.filter_width)  # Conversion to Xi-space!
 
         # dirac_LES_sums = self.compute_LES_cell_sum(self.dirac_times_grad_xi)
         # self.Xi_iso_filtered[:, :, :, id] = dirac_LES_sums / self.filter_width ** 2
@@ -2386,10 +2386,10 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
         self.compute_Pfitzner_model()
 
         # # compute Xi iso surface area for all c_iso values
-        # self.compute_Xi_iso_dirac_xi()
+        # self.compute_Xi_iso_dirac_xi_old()
 
         # 2nd method to compute Xi
-        Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi_2(c_iso=0.85)
+        Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
 
         # marching cubes to compute Xi
         isoArea_coefficient = self.compute_isoArea(c_iso=0.85)
@@ -2424,3 +2424,253 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
         print('Data has been written.\n\n')
 
 
+
+################################################
+# INCLUDE NOW THE VELOCITY DATA UWV.dat to compute sl
+# 20.4.2020
+
+class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
+    '''
+        Analysis includes now the velocity data
+    '''
+
+    def __init__(self,case, eps_factor,c_iso_values):
+        # extend super class with additional input parameters
+        super(dns_analysis_UVW, self).__init__(case, eps_factor,c_iso_values)
+
+        print('This is the version that includes velocity components ...')
+
+        self.U = None
+        self.V = None
+        self.W = None
+
+        self.U_bar = None
+        self.V_bar = None
+        self.W_bar = None
+
+        self.U_prime = None
+        self.V_prime = None
+        self.W_prime = None
+
+        # create empty array
+        self.grad_U_bar = np.zeros([self.Nx, self.Ny, self.Nz])
+        self.grad_V_bar = np.zeros([self.Nx, self.Ny, self.Nz])
+        self.grad_W_bar = np.zeros([self.Nx, self.Ny, self.Nz])
+
+    def read_UVW(self):
+        '''
+        reads in the c field and stores it in self.c_data_np as np.array. 3D!!
+        :return: nothing
+        '''
+
+        print('Read in data the Velocity data array ...')
+
+        UVW_np = np.loadtxt(join(self.case,'UVW.dat'))
+
+        # assign to U,V,W and reshape to 3D array
+        self.U = UVW_np[:,0].reshape(self.Nx,self.Ny,self.Nz)
+        self.V = UVW_np[:, 1].reshape(self.Nx,self.Ny,self.Nz)
+        self.W = UVW_np[:, 2].reshape(self.Nx,self.Ny,self.Nz)
+
+        # delete to save memory
+        del UVW_np
+
+    def compute_U_prime(self):
+        '''
+        # compute the SGS velocity fluctuations
+        # u_prime is the STD of the U-DNS components within a LES cell
+        :return: nothing
+        '''
+        print('computing U prime components')
+
+        self.U_prime = scipy.ndimage.generic_filter(self.U, np.var, mode='reflect',
+                                                    size=(self.filter_width, self.filter_width,self.filter_width))
+        self.V_prime = scipy.ndimage.generic_filter(self.V, np.var, mode='reflect',
+                                                    size=(self.filter_width, self.filter_width, self.filter_width))
+        self.W_prime = scipy.ndimage.generic_filter(self.W, np.var, mode='reflect',
+                                                    size=(self.filter_width, self.filter_width, self.filter_width))
+
+
+    # def compute_Ka_sgs(self):
+    #     '''
+    #     # compute the SGS Ka number
+    #     :return: nothing
+    #     '''
+    #
+    #     if self.case.startswith('NX512'):
+    #         self.d_th_DNS = 0.051
+    #     elif self.case.startswith('NX768'):
+    #         self.d_th_DNS = 0.042
+    #     else:
+    #         print('I dont know which d_th_DNS!')
+    #         sys.exit()
+    #
+    #     self.s_L =
+    #     print('computing Ka_sgs with hard coded s_L=%f and d_th=%f' % (s_L,))
+
+    def compute_gradU_LES_4thO(self):
+        '''
+        Compute the magnitude of the gradient of the DNS c-field, based on neighbour cells
+        4th Order central differencing
+        :return: nothing
+        '''
+
+        print('Computing gradients of U_bar on DNS mesh 4th Order...')
+
+        # compute gradients from the boundaries away ...
+        for l in range(2,self.Nx-2):
+            for m in range(2,self.Ny-2):
+                for n in range(2,self.Nz-2):
+                    this_U_gradX = (-self.U_bar[l+2, m, n] + 8*self.U_bar[l+1,m, n] - 8*self.U_bar[l-1,m, n] + self.U_bar[l-2, m, n])/(12 * self.delta_x)
+                    this_U_gradY = (-self.U_bar[l, m+2, n] + 8*self.U_bar[l,m+1, n] - 8*self.U_bar[l,m-1, n] + self.U_bar[l, m-2, n])/(12 * self.delta_x)
+                    this_U_gradZ = (-self.U_bar[l, m, n+2] + 8*self.U_bar[l,m, n+1] - 8*self.U_bar[l,m, n-1] + self.U_bar[l, m, n+2])/(12 * self.delta_x)
+
+                    this_V_gradX = (-self.V_bar[l+2, m, n] + 8*self.V_bar[l+1,m, n] - 8*self.V_bar[l-1,m, n] + self.V_bar[l-2, m, n])/(12 * self.delta_x)
+                    this_V_gradY = (-self.V_bar[l, m+2, n] + 8*self.V_bar[l,m+1, n] - 8*self.V_bar[l,m-1, n] + self.V_bar[l, m-2, n])/(12 * self.delta_x)
+                    this_V_gradZ = (-self.V_bar[l, m, n+2] + 8*self.V_bar[l,m, n+1] - 8*self.V_bar[l,m, n-1] + self.V_bar[l, m, n+2])/(12 * self.delta_x)
+
+                    this_W_gradX = (-self.W_bar[l+2, m, n] + 8*self.W_bar[l+1,m, n] - 8*self.W_bar[l-1,m, n] + self.W_bar[l-2, m, n])/(12 * self.delta_x)
+                    this_W_gradY = (-self.W_bar[l, m+2, n] + 8*self.W_bar[l,m+1, n] - 8*self.W_bar[l,m-1, n] + self.W_bar[l, m-2, n])/(12 * self.delta_x)
+                    this_W_gradZ = (-self.W_bar[l, m, n+2] + 8*self.W_bar[l,m, n+1] - 8*self.W_bar[l,m, n-1] + self.W_bar[l, m, n+2])/(12 * self.delta_x)
+
+                    # compute the magnitude of the gradient
+                    this_magGrad_U = np.sqrt(this_U_gradX ** 2 + this_U_gradY ** 2 + this_U_gradZ ** 2)
+                    this_magGrad_V = np.sqrt(this_V_gradX ** 2 + this_V_gradY ** 2 + this_V_gradZ ** 2)
+                    this_magGrad_W = np.sqrt(this_W_gradX ** 2 + this_W_gradY ** 2 + this_W_gradZ ** 2)
+
+                    self.grad_U_bar[l, m, n] = this_magGrad_U
+                    self.grad_V_bar[l, m, n] = this_magGrad_V
+                    self.grad_W_bar[l, m, n] = this_magGrad_W
+
+
+    def run_analysis_UVW(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        ##Todo: muss noch überarbeitet werden!
+
+        self.every_nth = 1
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        #('Reading in U fieds ...')
+        self.read_UVW()
+
+        # filter the c and rho field
+        print('Filtering c field ')
+        #self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+
+        print('Filtering U components')
+        self.U_bar = self.apply_filter(self.U)
+        self.V_bar = self.apply_filter(self.V)
+        self.W_bar = self.apply_filter(self.W)
+
+        # computing u' sgs
+        self.compute_U_prime()
+
+        # release memory and delete U fields
+        del self.U, self.W, self.V
+
+        # compute grad(U_bar)
+        self.compute_gradU_LES_4thO()
+
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+        # Set the Gauss kernel
+        #self.set_gaussian_kernel()
+
+        # compute the wrinkling factor: NOT NEEDED here!
+        # self.get_wrinkling()
+
+        # compute abs(grad(c)) on the whole DNS domain
+        self.grad_xi_DNS = self.compute_DNS_grad_xi()
+
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        # # compute Xi iso surface area for all c_iso values
+        # self.compute_Xi_iso_dirac_xi_old()
+
+        # 2nd method to compute Xi
+        Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
+
+        # # marching cubes to compute Xi
+        # isoArea_coefficient = self.compute_isoArea(c_iso=0.85)
+
+        # creat dask array and reshape all data
+        # a bit nasty for list in list as of variable c_iso values
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  #self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
+                                  Xi_iso_085.reshape(self.Nx*self.Ny*self.Nz,1),
+
+                                  self.U_bar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  self.W_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+
+                                  self.U_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  self.V_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  self.W_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+
+                                  self.grad_U_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  self.grad_V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  self.grad_W_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+
+                                  #isoArea_coefficient.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  #dirac_grad_xi_arr.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  ])
+
+        filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_UWV.csv')
+
+        dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=
+                                                  ['c_bar',
+                                                   'omega_DNS_filtered',
+                                                   'omega_model_planar',
+                                                   'Xi_iso_085',
+                                                   #'Xi_march_cube_085',
+                                                   #'dirac_grad_xi'
+                                                   'U_bar'
+                                                   'V_bar',
+                                                   'W_bar',
+                                                   'U_prime',
+                                                   'V_prime',
+                                                   'W_prime',
+                                                   'grad_U',
+                                                   'grad_V',
+                                                   'grad_W'
+                                                   ])
+
+        # filter the data set and remove unecessary entries
+        dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
+        dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.999]
+
+        dataArray_dd = dataArray_dd[dataArray_dd['grad_U'] != 0.0]
+
+        print('Computing data array ...')
+        dataArray_df = dataArray_dd.compute()
+
+        print('Writing output to csv ...')
+        dataArray_df.to_csv(filename,index=False)
+        print('Data has been written.\n\n')
