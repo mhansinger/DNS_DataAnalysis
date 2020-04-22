@@ -1,9 +1,11 @@
 '''
-This is to read in the binary data File for the high pressure bunsen data
+This is to read in the binary data File for the high pressure bunsen data and planar turbulent flame
+
+use: dns_analysis_UVW -> includes the Velocity data for the post processing
 
 @author: mhansinger
 
-last change: March 2020
+last change: April 2020
 '''
 
 import numpy as np
@@ -12,7 +14,7 @@ import matplotlib.pyplot as plt
 import os
 from os.path import join
 import dask.dataframe as dd
-#from numba import jit
+from numba import jit, cuda
 #from mayavi import mlab
 # to free memory
 import gc
@@ -31,6 +33,8 @@ import copy
 # for numerical integration
 from scipy.integrate import simps
 
+#external cython function
+from external_cython.compute_uprime_cython import compute_U_prime_cython
 
 class dns_analysis_base(object):
     # Base class. To be inherited from
@@ -220,11 +224,11 @@ class dns_analysis_base(object):
 
         if self.filter_type == 'GAUSS':
             self.sigma_xyz = [int(self.filter_width/2), int(self.filter_width/2) ,int(self.filter_width/2)]
-            data_filtered = sp.ndimage.filters.gaussian_filter(data, self.sigma_xyz, truncate=1.0, mode='reflect')
+            data_filtered = sp.ndimage.filters.gaussian_filter(data, self.sigma_xyz, truncate=1.0, mode='wrap')
             return data_filtered
 
         elif self.filter_type == 'TOPHAT':
-            data_filtered = sp.ndimage.filters.uniform_filter(data, [self.filter_width,self.filter_width,self.filter_width],mode='reflect')
+            data_filtered = sp.ndimage.filters.uniform_filter(data, [self.filter_width,self.filter_width,self.filter_width],mode='wrap')
             return data_filtered
 
         else:
@@ -2457,6 +2461,8 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         self.grad_V_bar = np.zeros([self.Nx, self.Ny, self.Nz])
         self.grad_W_bar = np.zeros([self.Nx, self.Ny, self.Nz])
 
+
+
     def read_UVW(self):
         '''
         reads in the c field and stores it in self.c_data_np as np.array. 3D!!
@@ -2468,28 +2474,95 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         UVW_np = np.loadtxt(join(self.case,'UVW.dat'))
 
         # assign to U,V,W and reshape to 3D array
-        self.U = UVW_np[:,0].reshape(self.Nx,self.Ny,self.Nz)
+        self.U = UVW_np[:, 0].reshape(self.Nx,self.Ny,self.Nz)
         self.V = UVW_np[:, 1].reshape(self.Nx,self.Ny,self.Nz)
         self.W = UVW_np[:, 2].reshape(self.Nx,self.Ny,self.Nz)
 
         # delete to save memory
         del UVW_np
 
+    @jit(nopython=True, parallel=True)
     def compute_U_prime(self):
         '''
         # compute the SGS velocity fluctuations
         # u_prime is the STD of the U-DNS components within a LES cell
         :return: nothing
         '''
-        print('computing U prime components')
-
-        self.U_prime = scipy.ndimage.generic_filter(self.U, np.var, mode='reflect',
+        print('Computing U prime')
+        self.U_prime = scipy.ndimage.generic_filter(self.U, np.var, mode='wrap',
                                                     size=(self.filter_width, self.filter_width,self.filter_width))
-        self.V_prime = scipy.ndimage.generic_filter(self.V, np.var, mode='reflect',
+        print('Computing V prime')
+        self.V_prime = scipy.ndimage.generic_filter(self.V, np.var, mode='wrap',
                                                     size=(self.filter_width, self.filter_width, self.filter_width))
-        self.W_prime = scipy.ndimage.generic_filter(self.W, np.var, mode='reflect',
+        print('Computing W prime')
+        self.W_prime = scipy.ndimage.generic_filter(self.W, np.var, mode='wrap',
                                                     size=(self.filter_width, self.filter_width, self.filter_width))
 
+    def compute_U_prime_alternative(self,U,V,W,Nx,Ny,Nz, filter_width):
+
+        # translate that to CYTHON
+
+        # print('\noutput_array.shape: ',output_array.shape)
+
+        output_U = np.zeros((Nx, Ny, Nz))                 # set output array to zero
+        output_V = np.zeros((Nx, Ny, Nz))
+        output_W = np.zeros((Nx, Ny, Nz))
+
+        half_filter = int(filter_width / 2)
+
+        les_filter = filter_width*filter_width*filter_width
+
+        for l in range(half_filter, Nx - half_filter, 1):
+            for m in range(half_filter, Ny - half_filter, 1):
+                for n in range(half_filter, Nz - half_filter, 1):
+
+                    this_LES_box_U = (U[l - half_filter: l + half_filter,
+                                    m - half_filter: m + half_filter,
+                                    n - half_filter: n + half_filter])
+
+                    this_LES_box_V = (V[l - half_filter: l + half_filter,
+                                    m - half_filter: m + half_filter,
+                                    n - half_filter: n + half_filter])
+
+                    this_LES_box_W = (W[l - half_filter: l + half_filter,
+                                    m - half_filter: m + half_filter,
+                                    n - half_filter: n + half_filter])
+
+                    # compute the means of each cell
+                    mean_U = 0.0
+                    mean_V = 0.0
+                    mean_W = 0.0
+                    this_U_prime = 0.0
+                    this_V_prime = 0.0
+                    this_W_prime = 0.0
+                    for i in range(0,filter_width):
+                        for j in range(0, filter_width):
+                            for k in range(0, filter_width):
+                                mean_U = mean_U + this_LES_box_U[i, j, k]
+                                mean_V = mean_V + this_LES_box_V[i, j, k]
+                                mean_W = mean_W + this_LES_box_W[i, j, k]
+
+                    mean_U = mean_U / les_filter
+                    mean_V = mean_V / les_filter
+                    mean_W = mean_W / les_filter
+                    # compute the variance of each cell
+
+                    for i in range(0,filter_width):
+                        for j in range(0, filter_width):
+                            for k in range(0, filter_width):
+                                this_U_prime = this_U_prime+ (this_LES_box_U[i,j,k] - mean_U) *\
+                                               (this_LES_box_U[i,j,k] - mean_U)
+                                this_V_prime = this_V_prime + (this_LES_box_V[i, j, k] - mean_V) * \
+                                               (this_LES_box_V[i, j, k] - mean_V)
+                                this_W_prime = this_W_prime + (this_LES_box_W[i, j, k] - mean_W) * \
+                                               (this_LES_box_W[i, j, k] - mean_W)
+
+                    # compute c_bar of current LES box
+                    output_U[l,m,n] = this_U_prime
+                    output_V[l, m, n] = this_V_prime
+                    output_W[l, m, n] = this_W_prime
+
+        return output_U, output_W, output_W
 
     # def compute_Ka_sgs(self):
     #     '''
@@ -2508,6 +2581,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
     #     self.s_L =
     #     print('computing Ka_sgs with hard coded s_L=%f and d_th=%f' % (s_L,))
 
+    @jit(nopython=True, parallel=True)
     def compute_gradU_LES_4thO(self):
         '''
         Compute the magnitude of the gradient of the DNS c-field, based on neighbour cells
@@ -2574,13 +2648,16 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
         self.c_filtered = self.apply_filter(self.c_data_np)
 
+
         print('Filtering U components')
         self.U_bar = self.apply_filter(self.U)
         self.V_bar = self.apply_filter(self.V)
         self.W_bar = self.apply_filter(self.W)
 
+        #Todo: REPLACE WITH THE Cython function
         # computing u' sgs
-        self.compute_U_prime()
+        #self.compute_U_prime()
+        self.U_prime, self.V_prime, self.W_prime = compute_U_prime_cython(self.U, self.V, self.W, self.Nx, self.Ny, self.Nz, self.filter_width)
 
         # release memory and delete U fields
         del self.U, self.W, self.V
@@ -2597,36 +2674,24 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         #maximum possible wrinkling factor
         print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
 
-        # Set the Gauss kernel
-        #self.set_gaussian_kernel()
-
-        # compute the wrinkling factor: NOT NEEDED here!
-        # self.get_wrinkling()
-
         # compute abs(grad(c)) on the whole DNS domain
         self.grad_xi_DNS = self.compute_DNS_grad_xi()
 
         # compute omega based on pfitzner
         self.compute_Pfitzner_model()
 
-        # # compute Xi iso surface area for all c_iso values
-        # self.compute_Xi_iso_dirac_xi_old()
-
         # 2nd method to compute Xi
         Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
 
-        # # marching cubes to compute Xi
-        # isoArea_coefficient = self.compute_isoArea(c_iso=0.85)
-
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
                                   self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
                                   self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
                                   #self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
-                                  Xi_iso_085.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  Xi_iso_085.reshape(self.Nx * self.Ny * self.Nz,1),
 
-                                  self.U_bar.reshape(self.Nx*self.Ny*self.Nz,1),
+                                  self.U_bar.reshape(self.Nx * self.Ny * self.Nz,1),
                                   self.V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
                                   self.W_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
 
@@ -2642,7 +2707,14 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
                                   #dirac_grad_xi_arr.reshape(self.Nx*self.Ny*self.Nz,1),
                                   ])
 
-        filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_UWV.csv')
+        #################################
+        # FOR JUNSU
+        cols = dataArray_da.shape[1]
+        dataArray_da = dataArray_da.reshape(self.Nx,self.Ny,self.Nz,cols)[200:300,200:300,200:300,cols]
+        dataArray_da = dataArray_da.reshape(100**3,cols)
+        #################################
+
+        filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_UWV_Junsu.csv')
 
         dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=
                                                   ['c_bar',
@@ -2651,15 +2723,15 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
                                                    'Xi_iso_085',
                                                    #'Xi_march_cube_085',
                                                    #'dirac_grad_xi'
-                                                   'U_bar'
+                                                   'U_bar',
                                                    'V_bar',
                                                    'W_bar',
                                                    'U_prime',
                                                    'V_prime',
                                                    'W_prime',
-                                                   'grad_U',
-                                                   'grad_V',
-                                                   'grad_W'
+                                                   'mag_grad_U',
+                                                   'mag_grad_V',
+                                                   'mag_grad_W'
                                                    ])
 
         # filter the data set and remove unecessary entries
