@@ -33,7 +33,7 @@ import copy
 # for numerical integration
 from scipy.integrate import simps
 
-#external cython function
+#external cython functions
 from external_cython.compute_uprime_cython import compute_U_prime_cython
 from external_cython.compute_gradU_LES_4tO_cython import compute_gradU_LES_4thO_cython
 from external_cython.compute_DNS_grad_xi_4thO_cython import compute_DNS_grad_xi_4thO_cython
@@ -182,7 +182,7 @@ class dns_analysis_base(object):
         print('Reading in c-field data...')
 
         try:
-            c_data_vec = np.loadtxt(self.c_path)
+            c_data_vec = pd.read_csv(self.c_path,names=['c']).values.astype(dtype=np.float32)
             self.c_data_np = c_data_vec.reshape(self.Nx,self.Ny,self.Nz)
 
         except OSError:
@@ -2474,19 +2474,16 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
 
         print('Read in data the Velocity data array ...')
 
-        UVW_np = np.loadtxt(join(self.case,'UVW.dat'))
+        U_np = pd.read_csv(join(self.case,'U.dat'),names=['U']).values.astype(dtype=np.float32)
+        V_np = pd.read_csv(join(self.case, 'V.dat'), names=['U']).values.astype(dtype=np.float32)
+        W_np = pd.read_csv(join(self.case, 'W.dat'), names=['U']).values.astype(dtype=np.float32)
 
-        # # assign to U,V,W and reshape to 3D array as np.ascontiguousarray. Needed for the cython function
-        # self.U = np.ascontiguousarray(UVW_np[:, 0].reshape(self.Nx,self.Ny,self.Nz), dtype=np.float64)
-        # self.V = np.ascontiguousarray(UVW_np[:, 1].reshape(self.Nx,self.Ny,self.Nz), dtype=np.float64)
-        # self.W = np.ascontiguousarray(UVW_np[:, 2].reshape(self.Nx,self.Ny,self.Nz), dtype=np.float64)
-
-        self.U = UVW_np[:, 0].reshape(self.Nx,self.Ny,self.Nz)
-        self.V = UVW_np[:, 1].reshape(self.Nx,self.Ny,self.Nz)
-        self.W = UVW_np[:, 2].reshape(self.Nx,self.Ny,self.Nz)
+        self.U = U_np[:, 0].reshape(self.Nx,self.Ny,self.Nz)
+        self.V = V_np[:, 1].reshape(self.Nx,self.Ny,self.Nz)
+        self.W = W_np[:, 2].reshape(self.Nx,self.Ny,self.Nz)
 
         # delete to save memory
-        del UVW_np
+        del U_np, V_np, W_np
 
     #@jit(nopython=True, parallel=True)
     def compute_U_prime(self):
