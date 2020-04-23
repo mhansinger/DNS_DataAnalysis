@@ -4,16 +4,20 @@
 import numpy as np
 cimport numpy as np
 cimport cython
-#from cython.parallel import prange
+# from cython.parallel import prange
 
 
-
-DTYPE = np.float
+#################
+# USE SINGLE PRECISSION (np.float32 and float in C) FOR SPEED UP
+#################
+DTYPE = np.float32
 ctypedef np.float_t DTYPE_t
 
 
 @cython.boundscheck(False)
-def compute_U_prime_cython(double[:, :, ::1] U, double[:, :, ::1] V, double[:, :, ::1] W,
+@cython.wraparound(False)
+# cpdef or cdef does not matter in speed tests
+cpdef compute_U_prime_cython(float[:, :, ::1] U, float[:, :, ::1] V, float[:, :, ::1] W,
                            int Nx, int Ny, int Nz, int filter_width):
     # translate that to CYTHON
     '''
@@ -32,29 +36,29 @@ def compute_U_prime_cython(double[:, :, ::1] U, double[:, :, ::1] V, double[:, :
     '''
     # print('\noutput_array.shape: ',output_array.shape)
 
-    cdef double[:, :,::1] output_U = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero
-    cdef double[:, :,::1] output_V = np.zeros([Nx, Ny, Nz],dtype=DTYPE)
-    cdef double[:, :,::1] output_W = np.zeros([Nx, Ny, Nz],dtype=DTYPE)
+    cdef float[:, :,::1] output_U = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero
+    cdef float[:, :,::1] output_V = np.zeros([Nx, Ny, Nz],dtype=DTYPE)
+    cdef float[:, :,::1] output_W = np.zeros([Nx, Ny, Nz],dtype=DTYPE)
 
     cdef int half_filter = filter_width / 2
 
-    cdef double les_filter = filter_width * filter_width * filter_width
+    cdef float les_filter = filter_width * filter_width * filter_width
 
     # the indexes should be unsigned integers
     cdef unsigned int i, j, k, l, m, n
 
     # helper variables
-    cdef double this_U_prime
-    cdef double this_V_prime
-    cdef double this_W_prime
+    cdef float this_U_prime
+    cdef float this_V_prime
+    cdef float this_W_prime
 
-    cdef double mean_U
-    cdef double mean_V
-    cdef double mean_W
+    cdef float mean_U
+    cdef float mean_V
+    cdef float mean_W
 
-    cdef double[:, :, ::1] this_LES_box_U
-    cdef double[:, :, ::1] this_LES_box_V
-    cdef double[:, :, ::1] this_LES_box_W
+    cdef float[:, :, ::1] this_LES_box_U
+    cdef float[:, :, ::1] this_LES_box_V
+    cdef float[:, :, ::1] this_LES_box_W
 
     for l in range(half_filter, Nx - half_filter, 1):
         for m in range(half_filter, Ny - half_filter, 1):

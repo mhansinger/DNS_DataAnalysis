@@ -35,6 +35,9 @@ from scipy.integrate import simps
 
 #external cython function
 from external_cython.compute_uprime_cython import compute_U_prime_cython
+from external_cython.compute_gradU_LES_4tO_cython import compute_gradU_LES_4thO_cython
+from external_cython.compute_DNS_grad_xi_4thO_cython import compute_DNS_grad_xi_4thO_cython
+
 
 class dns_analysis_base(object):
     # Base class. To be inherited from
@@ -2473,7 +2476,11 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
 
         UVW_np = np.loadtxt(join(self.case,'UVW.dat'))
 
-        # assign to U,V,W and reshape to 3D array
+        # # assign to U,V,W and reshape to 3D array as np.ascontiguousarray. Needed for the cython function
+        # self.U = np.ascontiguousarray(UVW_np[:, 0].reshape(self.Nx,self.Ny,self.Nz), dtype=np.float64)
+        # self.V = np.ascontiguousarray(UVW_np[:, 1].reshape(self.Nx,self.Ny,self.Nz), dtype=np.float64)
+        # self.W = np.ascontiguousarray(UVW_np[:, 2].reshape(self.Nx,self.Ny,self.Nz), dtype=np.float64)
+
         self.U = UVW_np[:, 0].reshape(self.Nx,self.Ny,self.Nz)
         self.V = UVW_np[:, 1].reshape(self.Nx,self.Ny,self.Nz)
         self.W = UVW_np[:, 2].reshape(self.Nx,self.Ny,self.Nz)
@@ -2481,7 +2488,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         # delete to save memory
         del UVW_np
 
-    @jit(nopython=True, parallel=True)
+    #@jit(nopython=True, parallel=True)
     def compute_U_prime(self):
         '''
         # compute the SGS velocity fluctuations
@@ -2581,13 +2588,15 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
     #     self.s_L =
     #     print('computing Ka_sgs with hard coded s_L=%f and d_th=%f' % (s_L,))
 
-    @jit(nopython=True, parallel=True)
+    #@jit(nopython=True, parallel=True)
     def compute_gradU_LES_4thO(self):
-        '''
-        Compute the magnitude of the gradient of the DNS c-field, based on neighbour cells
-        4th Order central differencing
-        :return: nothing
-        '''
+        # '''
+        # Compute the magnitude of the gradient of the DNS c-field, based on neighbour cells
+        # 4th Order central differencing
+        # :return: nothing
+        # '''
+
+        # TODO: externalize?
 
         print('Computing gradients of U_bar on DNS mesh 4th Order...')
 
@@ -2648,23 +2657,48 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
         self.c_filtered = self.apply_filter(self.c_data_np)
 
-
+        #Todo: In paralllel? How?
         print('Filtering U components')
         self.U_bar = self.apply_filter(self.U)
         self.V_bar = self.apply_filter(self.V)
         self.W_bar = self.apply_filter(self.W)
 
-        #Todo: REPLACE WITH THE Cython function
-        # computing u' sgs
-        #self.compute_U_prime()
-        self.U_prime, self.V_prime, self.W_prime = compute_U_prime_cython(self.U, self.V, self.W, self.Nx, self.Ny, self.Nz, self.filter_width)
+        ###########################
+        print('Computing U primes')
+        # imported cython function: dtype needs to be float32!
+        U_prime, V_prime, W_prime = compute_U_prime_cython(np.ascontiguousarray(self.U, dtype=np.float32),
+                                                            np.ascontiguousarray(self.V, dtype=np.float32),
+                                                            np.ascontiguousarray(self.W, dtype=np.float32),
+                                                            self.Nx, self.Ny, self.Nz, self.filter_width)
+
+        #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+        self.U_prime = np.asarray(U_prime)
+        self.V_prime = np.asarray(V_prime)
+        self.W_prime = np.asarray(W_prime)
+
+
 
         # release memory and delete U fields
-        del self.U, self.W, self.V
+        del self.U, self.W, self.V, U_prime, V_prime, W_prime
 
-        # compute grad(U_bar)
-        self.compute_gradU_LES_4thO()
+        ###########################
+        # compute the magnitude of gradients of the velocity field
+        #self.compute_gradU_LES_4thO()
+        # use imported cython function: dtype needs to be float32!
+        grad_U_bar, grad_V_bar, grad_W_bar = compute_gradU_LES_4thO_cython(
+                                                                    np.ascontiguousarray(self.U_bar, dtype=np.float32),
+                                                                    np.ascontiguousarray(self.V_bar, dtype=np.float32),
+                                                                    np.ascontiguousarray(self.W_bar, dtype=np.float32),
+                                                                    self.Nx, self.Ny, self.Nz, self.delta_x)
 
+        #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+        self.grad_U_bar = np.asarray(grad_U_bar)
+        self.grad_V_bar = np.asarray(grad_V_bar)
+        self.grad_W_bar = np.asarray(grad_W_bar)
+
+        del grad_U_bar, grad_V_bar, grad_W_bar  #free memory
+
+        ###########################
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
         print('Delta_LES is: %.3f' % self.Delta_LES)
@@ -2674,9 +2708,20 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         #maximum possible wrinkling factor
         print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
 
-        # compute abs(grad(c)) on the whole DNS domain
-        self.grad_xi_DNS = self.compute_DNS_grad_xi()
 
+        ###########################
+        # compute abs(grad(c)) on the whole DNS domain
+        self.convert_c_field_to_xi()
+        # self.grad_xi_DNS = self.compute_DNS_grad_xi_4thO()
+        # CYTHON
+        grad_xi_DNS = compute_DNS_grad_xi_4thO_cython(np.ascontiguousarray(self.xi_np, dtype=np.float32),
+                                                      self.Nx, self.Ny, self.Nz, self.delta_x)
+
+        self.grad_xi_DNS = np.asarray(grad_xi_DNS)
+
+        del grad_xi_DNS     # free memory
+
+        ###########################
         # compute omega based on pfitzner
         self.compute_Pfitzner_model()
 
@@ -2734,11 +2779,11 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
                                                    'mag_grad_W'
                                                    ])
 
-        # filter the data set and remove unecessary entries
-        dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
-        dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.999]
-
-        dataArray_dd = dataArray_dd[dataArray_dd['grad_U'] != 0.0]
+        # # filter the data set and remove unecessary entries
+        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
+        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.999]
+        #
+        # dataArray_dd = dataArray_dd[dataArray_dd['grad_U'] != 0.0]
 
         print('Computing data array ...')
         dataArray_df = dataArray_dd.compute()
