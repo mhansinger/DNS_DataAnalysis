@@ -2464,23 +2464,24 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         self.grad_V_bar = np.zeros([self.Nx, self.Ny, self.Nz])
         self.grad_W_bar = np.zeros([self.Nx, self.Ny, self.Nz])
 
+    # constructor end
 
 
     def read_UVW(self):
         '''
-        reads in the c field and stores it in self.c_data_np as np.array. 3D!!
+        reads in the velocity fields and stores it as np.array. 3D!!
         :return: nothing
         '''
 
         print('Read in data the Velocity data array ...')
 
-        U_np = pd.read_csv(join(self.case,'U.dat'),names=['U']).values.astype(dtype=np.float32)
+        U_np = pd.read_csv(join(self.case, 'U.dat'), names=['U']).values.astype(dtype=np.float32)
         V_np = pd.read_csv(join(self.case, 'V.dat'), names=['U']).values.astype(dtype=np.float32)
         W_np = pd.read_csv(join(self.case, 'W.dat'), names=['U']).values.astype(dtype=np.float32)
 
-        self.U = U_np[:, 0].reshape(self.Nx,self.Ny,self.Nz)
-        self.V = V_np[:, 1].reshape(self.Nx,self.Ny,self.Nz)
-        self.W = W_np[:, 2].reshape(self.Nx,self.Ny,self.Nz)
+        self.U = U_np.reshape(self.Nx,self.Ny,self.Nz)
+        self.V = V_np.reshape(self.Nx,self.Ny,self.Nz)
+        self.W = W_np.reshape(self.Nx,self.Ny,self.Nz)
 
         # delete to save memory
         del U_np, V_np, W_np
