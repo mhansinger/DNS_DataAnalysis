@@ -28,6 +28,8 @@ cpdef compute_gradU_LES_4thO_cython(float[:, :, ::1] U_bar, float[:, :, ::1] V_b
     cdef float[:, :,::1] grad_V_bar = np.zeros([Nx, Ny, Nz],dtype=DTYPE)
     cdef float[:, :,::1] grad_W_bar = np.zeros([Nx, Ny, Nz],dtype=DTYPE)
 
+    # the indexes should be unsigned integers
+    cdef unsigned int l, m, n
 
     print('Computing gradients of U_bar on DNS mesh 4th Order with Cython')
 
