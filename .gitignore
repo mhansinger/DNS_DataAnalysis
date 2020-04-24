@@ -11,4 +11,6 @@ __pycache__
 
 *.npy
 plots
-
+dummy.*
+*.pkl
+*.h5
