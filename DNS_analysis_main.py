@@ -35,8 +35,8 @@ from scipy.integrate import simps
 
 #external cython functions
 from external_cython.compute_uprime_cython import compute_U_prime_cython
-from external_cython.compute_gradU_LES_4tO_cython import compute_gradU_LES_4thO_cython
-from external_cython.compute_DNS_grad_xi_4thO_cython import compute_DNS_grad_xi_4thO_cython
+from external_cython.compute_gradU_LES_4thO_cython import compute_gradU_LES_4thO_cython
+from external_cython.compute_DNS_grad_4thO_cython import compute_DNS_grad_4thO_cython
 
 
 class dns_analysis_base(object):
@@ -2676,7 +2676,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
 
 
 
-        # release memory and delete U fields
+        # free memory and delete U fields
         del self.U, self.W, self.V, U_prime, V_prime, W_prime
 
         ###########################
@@ -2687,7 +2687,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
                                                                     np.ascontiguousarray(self.U_bar, dtype=np.float32),
                                                                     np.ascontiguousarray(self.V_bar, dtype=np.float32),
                                                                     np.ascontiguousarray(self.W_bar, dtype=np.float32),
-                                                                    self.Nx, self.Ny, self.Nz, self.delta_x)
+                                                                    self.Nx, self.Ny, self.Nz, np.float32(self.delta_x))
 
         #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
         self.grad_U_bar = np.asarray(grad_U_bar)
@@ -2708,16 +2708,29 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
 
 
         ###########################
-        # compute abs(grad(c)) on the whole DNS domain
+        # compute abs(grad(xi)) on the whole DNS domain
         self.convert_c_field_to_xi()
         # self.grad_xi_DNS = self.compute_DNS_grad_xi_4thO()
         # CYTHON
-        grad_xi_DNS = compute_DNS_grad_xi_4thO_cython(np.ascontiguousarray(self.xi_np, dtype=np.float32),
-                                                      self.Nx, self.Ny, self.Nz, self.delta_x)
+        print('Computing gradients of xi on DNS mesh 4th Order with Cython')
+        grad_xi_DNS = compute_DNS_grad_4thO_cython(np.ascontiguousarray(self.xi_np, dtype=np.float32),
+                                                      self.Nx, self.Ny, self.Nz, np.float32(self.delta_x))
 
         self.grad_xi_DNS = np.asarray(grad_xi_DNS)
 
         del grad_xi_DNS     # free memory
+
+
+        ###########################
+        # compute abs(grad(xi)) on the whole DNS domain
+        # CYTHON
+        print('Computing gradients of c_bar on DNS mesh 4th Order with Cython')
+        grad_c_bar_DNS = compute_DNS_grad_4thO_cython(np.ascontiguousarray(self.c_filtered, dtype=np.float32),
+                                                      self.Nx, self.Ny, self.Nz, np.float32(self.delta_x))
+
+        grad_c_bar_DNS = np.asarray(grad_c_bar_DNS)
+
+        #del grad_xi_DNS     # free memory
 
         ###########################
         # compute omega based on pfitzner
@@ -2728,44 +2741,62 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
-                                  self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                  self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                  #self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
-                                  Xi_iso_085.reshape(self.Nx * self.Ny * self.Nz,1),
+        # self.dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
+        #                           grad_c_bar_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           Xi_iso_085.reshape(self.Nx * self.Ny * self.Nz,1),
+        #                           self.U_bar.reshape(self.Nx * self.Ny * self.Nz,1),
+        #                           self.V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.W_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.U_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.V_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.W_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.grad_U_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.grad_V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+        #                           self.grad_W_bar.reshape(self.Nx * self.Ny * self.Nz, 1)
+        #                           ])
 
-                                  self.U_bar.reshape(self.Nx * self.Ny * self.Nz,1),
-                                  self.V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                  self.W_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
 
-                                  self.U_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                  self.V_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                  self.W_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
-
-                                  self.grad_U_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                  self.grad_V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                  self.grad_W_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
-
-                                  #isoArea_coefficient.reshape(self.Nx*self.Ny*self.Nz,1),
-                                  #dirac_grad_xi_arr.reshape(self.Nx*self.Ny*self.Nz,1),
+        self.dataArray_da = da.hstack([self.c_filtered[200:300,200:300,200:300].reshape(100**3,1),
+                                  grad_c_bar_DNS[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.omega_DNS_filtered[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.omega_model_cbar[200:300,200:300,200:300].reshape(100**3, 1),
+                                  Xi_iso_085[200:300,200:300,200:300].reshape(100**3,1),
+                                  self.U_bar[200:300,200:300,200:300].reshape(100**3,1),
+                                  self.V_bar[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.W_bar[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.U_prime[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.V_prime[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.W_prime[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.grad_U_bar[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.grad_V_bar[200:300,200:300,200:300].reshape(100**3, 1),
+                                  self.grad_W_bar[200:300,200:300,200:300].reshape(100**3, 1)
                                   ])
 
-        #################################
-        # FOR JUNSU
-        cols = dataArray_da.shape[1]
-        dataArray_da = dataArray_da.reshape(self.Nx,self.Ny,self.Nz,cols)[200:300,200:300,200:300,cols]
-        dataArray_da = dataArray_da.reshape(100**3,cols)
-        #################################
+        # #################################
+        # # FOR JUNSU
+        # cols = dataArray_da.shape[1]
+        # dataArray_da = dataArray_da.reshape(self.Nx,self.Ny,self.Nz,cols)
+        # dataArray_np = dataArray_da.compute()
+        # dataArray_np = dataArray_np[cols,200:300,200:300,200:300]
+        #
+        # print(dataArray_np.shape)
+        # # dataArray_da = dataArray_da.reshape(self.Nx,self.Ny,self.Nz,cols)#[cols,200:300,200:300,200:300]
+        # # dataArray_da = dataArray_da[cols,200:300,200:300,200:300]
+        # # dataArray_da = dataArray_da.reshape(100**3,cols)
+        # dataArray_np=dataArray_np.reshape(100 ** 3, cols)
+        # dataArray_da = da.from_array(dataArray_np)
+        # #################################
 
-        filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_UWV_Junsu.csv')
+        filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_UWV_Junsu.pkl')
 
-        dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=
+        dataArray_dd = dd.io.from_dask_array(self.dataArray_da,columns=
                                                   ['c_bar',
+                                                   'mag_grad_c_bar',
                                                    'omega_DNS_filtered',
                                                    'omega_model_planar',
                                                    'Xi_iso_085',
-                                                   #'Xi_march_cube_085',
-                                                   #'dirac_grad_xi'
                                                    'U_bar',
                                                    'V_bar',
                                                    'W_bar',
@@ -2786,6 +2817,6 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         print('Computing data array ...')
         dataArray_df = dataArray_dd.compute()
 
-        print('Writing output to csv ...')
-        dataArray_df.to_csv(filename,index=False)
+        print('Writing output to pickle ...')
+        dataArray_df.to_pickle(filename,index=False)
         print('Data has been written.\n\n')
