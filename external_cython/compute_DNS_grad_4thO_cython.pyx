@@ -1,5 +1,7 @@
 # CYTHON Version to compute velocity gradients
 
+#use: cythonize -a -i compute_DNS_grad_4thO_cython.pyx
+
 #import cython
 import numpy as np
 cimport numpy as np
@@ -37,7 +39,7 @@ cpdef compute_DNS_grad_4thO_cython(float[:, :, ::1] field, int Nx, int Ny, int N
             for n in range(2,Nz-2):
                 this_U_gradX = (-field[l+2, m, n] + 8*field[l+1,m, n] - 8*field[l-1,m, n] + field[l-2, m, n])/(12 * delta_x)
                 this_U_gradY = (-field[l, m+2, n] + 8*field[l,m+1, n] - 8*field[l,m-1, n] + field[l, m-2, n])/(12 * delta_x)
-                this_U_gradZ = (-field[l, m, n+2] + 8*field[l,m, n+1] - 8*field[l,m, n-1] + field[l, m, n+2])/(12 * delta_x)
+                this_U_gradZ = (-field[l, m, n+2] + 8*field[l,m, n+1] - 8*field[l,m, n-1] + field[l, m, n-2])/(12 * delta_x)
 
                 # compute the magnitude of the gradient
                 this_magGrad_U = sqrt(this_U_gradX ** 2 + this_U_gradY ** 2 + this_U_gradZ ** 2)

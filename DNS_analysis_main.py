@@ -37,6 +37,8 @@ from scipy.integrate import simps
 from external_cython.compute_uprime_cython import compute_U_prime_cython
 from external_cython.compute_gradU_LES_4thO_cython import compute_gradU_LES_4thO_cython
 from external_cython.compute_DNS_grad_4thO_cython import compute_DNS_grad_4thO_cython
+from external_cython.compute_gradU_LES_4thO_tensor_cython import compute_gradU_LES_4thO_tensor_cython
+from external_cython.compute_LES_grad_4thO_tensor_cython import compute_LES_grad_4thO_tensor_cython
 
 
 class dns_analysis_base(object):
@@ -2739,8 +2741,8 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         # 2nd method to compute Xi
         Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
 
-        creat dask array and reshape all data
-        a bit nasty for list in list as of variable c_iso values
+        # #creat dask array and reshape all data
+
         self.dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
                                   grad_c_bar_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
                                   self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
@@ -2774,21 +2776,6 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         #                           self.grad_W_bar[200:300,200:300,200:300].reshape(100**3, 1)
         #                           ])
 
-        # #################################
-        # # FOR JUNSU
-        # cols = dataArray_da.shape[1]
-        # dataArray_da = dataArray_da.reshape(self.Nx,self.Ny,self.Nz,cols)
-        # dataArray_np = dataArray_da.compute()
-        # dataArray_np = dataArray_np[cols,200:300,200:300,200:300]
-        #
-        # print(dataArray_np.shape)
-        # # dataArray_da = dataArray_da.reshape(self.Nx,self.Ny,self.Nz,cols)#[cols,200:300,200:300,200:300]
-        # # dataArray_da = dataArray_da[cols,200:300,200:300,200:300]
-        # # dataArray_da = dataArray_da.reshape(100**3,cols)
-        # dataArray_np=dataArray_np.reshape(100 ** 3, cols)
-        # dataArray_da = da.from_array(dataArray_np)
-        # #################################
-
         filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_UVW.pkl')
 
         dataArray_dd = dd.io.from_dask_array(self.dataArray_da,columns=
@@ -2821,4 +2808,272 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         dataArray_df.to_pickle(filename)
         print('Data has been written.\n\n')
 
+
+
+
+
+################################################
+# INCLUDE NOW THE VELOCITY DATA UWV.dat to compute sl
+# 20.4.2020
+
+class dns_analysis_tensors(dns_analysis_UVW):
+    '''
+        Analysis includes now the velocity data
+    '''
+
+    def __init__(self,case, eps_factor,c_iso_values):
+        # extend super class with additional input parameters
+        super(dns_analysis_tensors, self).__init__(case, eps_factor,c_iso_values)
+
+        print('This is the version that computes gradient tensors on DNS and LES grid ...')
+
+    # constructor end
+
+
+    def run_analysis_tensors(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        ##Todo: muss noch überarbeitet werden!
+
+        self.every_nth = 1
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        #('Reading in U fieds ...')
+        self.read_UVW()
+
+        # filter the c and rho field
+        print('Filtering c field ')
+        #self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+
+        #Todo: In paralllel? How?
+        print('Filtering U components')
+        self.U_bar = self.apply_filter(self.U)
+        self.V_bar = self.apply_filter(self.V)
+        self.W_bar = self.apply_filter(self.W)
+
+        ###########################
+        print('Computing U primes')
+        # imported cython function: dtype needs to be float32!
+        U_prime, V_prime, W_prime = compute_U_prime_cython(np.ascontiguousarray(self.U, dtype=np.float32),
+                                                            np.ascontiguousarray(self.V, dtype=np.float32),
+                                                            np.ascontiguousarray(self.W, dtype=np.float32),
+                                                            self.Nx, self.Ny, self.Nz, self.filter_width)
+
+        #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+        self.U_prime = np.asarray(U_prime)
+        self.V_prime = np.asarray(V_prime)
+        self.W_prime = np.asarray(W_prime)
+
+
+
+        # free memory and delete U fields
+        del self.U, self.W, self.V, U_prime, V_prime, W_prime
+
+        ###########################
+        # compute the magnitude of gradients of the velocity field on the LES mesh
+        #self.compute_gradU_LES_4thO()
+        # use imported cython function: dtype needs to be float32!
+        grad_U_x_LES, grad_V_x_LES, grad_W_x_LES, grad_U_y_LES, grad_V_y_LES, grad_W_y_LES, grad_U_z_LES, grad_V_z_LES, grad_W_z_LES = \
+                                                                    compute_gradU_LES_4thO_tensor_cython(
+                                                                    np.ascontiguousarray(self.U_bar, dtype=np.float32),
+                                                                    np.ascontiguousarray(self.V_bar, dtype=np.float32),
+                                                                    np.ascontiguousarray(self.W_bar, dtype=np.float32),
+                                                                    self.Nx, self.Ny, self.Nz,
+                                                                    np.float32(self.delta_x),int(self.filter_width))
+
+        # #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+        grad_U_x_LES = np.asarray(grad_U_x_LES)
+        grad_V_x_LES = np.asarray(grad_V_x_LES)
+        grad_W_x_LES = np.asarray(grad_W_x_LES)
+        grad_U_y_LES = np.asarray(grad_U_y_LES)
+        grad_V_y_LES = np.asarray(grad_V_y_LES)
+        grad_W_y_LES = np.asarray(grad_W_y_LES)
+        grad_U_z_LES = np.asarray(grad_U_z_LES)
+        grad_V_z_LES = np.asarray(grad_V_z_LES)
+        grad_W_z_LES = np.asarray(grad_W_z_LES)
+
+
+        # compute the U gradients on DNS mesh
+        grad_U_x_DNS, grad_V_x_DNS, grad_W_x_DNS, grad_U_y_DNS, grad_V_y_DNS, grad_W_y_DNS, grad_U_z_DNS, grad_V_z_DNS, grad_W_z_DNS = \
+                                                                    compute_gradU_LES_4thO_tensor_cython(
+                                                                    np.ascontiguousarray(self.U_bar, dtype=np.float32),
+                                                                    np.ascontiguousarray(self.V_bar, dtype=np.float32),
+                                                                    np.ascontiguousarray(self.W_bar, dtype=np.float32),
+                                                                    self.Nx, self.Ny, self.Nz,
+                                                                    np.float32(self.delta_x),int(1))
+
+        # #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+        grad_U_x_DNS = np.asarray(grad_U_x_DNS)
+        grad_V_x_DNS = np.asarray(grad_V_x_DNS)
+        grad_W_x_DNS = np.asarray(grad_W_x_DNS)
+        grad_U_y_DNS = np.asarray(grad_U_y_DNS)
+        grad_V_y_DNS = np.asarray(grad_V_y_DNS)
+        grad_W_y_DNS = np.asarray(grad_W_y_DNS)
+        grad_U_z_DNS = np.asarray(grad_U_z_DNS)
+        grad_V_z_DNS = np.asarray(grad_V_z_DNS)
+        grad_W_z_DNS = np.asarray(grad_W_z_DNS)
+
+        ###########################
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+
+        ###########################
+        # compute abs(grad(xi)) on the whole DNS domain
+        self.convert_c_field_to_xi()
+        # self.grad_xi_DNS = self.compute_DNS_grad_xi_4thO()
+        # CYTHON
+        print('Computing gradients of xi on DNS mesh 4th Order with Cython')
+        grad_xi_DNS = compute_DNS_grad_4thO_cython(np.ascontiguousarray(self.xi_np, dtype=np.float32),
+                                                      self.Nx, self.Ny, self.Nz, np.float32(self.delta_x))
+
+        self.grad_xi_DNS = np.asarray(grad_xi_DNS)
+
+        del grad_xi_DNS     # free memory
+
+
+        ###########################
+        # compute abs(grad(xi)) on the whole DNS domain
+        # CYTHON
+        print('Computing x,y,z gradients of c_bar on DNS mesh 4th Order with Cython')
+        grad_c_x_DNS, grad_c_y_DNS, grad_c_z_DNS = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_filtered, dtype=np.float32),
+                                                      self.Nx, self.Ny, self.Nz, np.float32(self.delta_x), int(1))
+
+        grad_c_x_DNS = np.asarray(grad_c_x_DNS)
+        grad_c_y_DNS = np.asarray(grad_c_y_DNS)
+        grad_c_z_DNS = np.asarray(grad_c_z_DNS)
+
+
+        print('Computing x,y,z gradients of c_bar on LES mesh 4th Order with Cython')
+        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_filtered, dtype=np.float32),
+                                                      self.Nx, self.Ny, self.Nz, np.float32(self.delta_x), int(self.filter_width))
+
+        grad_c_x_LES = np.asarray(grad_c_x_LES)
+        grad_c_y_LES = np.asarray(grad_c_y_LES)
+        grad_c_z_LES = np.asarray(grad_c_z_LES)
+
+        #del grad_xi_DNS     # free memory
+
+        ###########################
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        # 2nd method to compute Xi
+        Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
+
+        # #creat dask array and reshape all data
+
+        self.dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
+                                        grad_c_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_c_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_c_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_c_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_c_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_c_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          Xi_iso_085.reshape(self.Nx * self.Ny * self.Nz,1),
+                                          self.U_bar.reshape(self.Nx * self.Ny * self.Nz,1),
+                                          self.V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.W_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.U_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.V_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.W_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_U_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_V_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_W_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_U_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_V_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_W_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_U_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_V_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_W_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_U_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_V_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_W_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_U_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_V_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_W_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_U_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_V_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        grad_W_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                  ])
+
+        filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_tensor.pkl')
+
+        dataArray_dd = dd.io.from_dask_array(self.dataArray_da,columns=
+                                                  ['c_bar',
+                                                   'grad_c_x_LES',
+                                                   'grad_c_y_LES',
+                                                   'grad_c_z_LES',
+                                                   'grad_c_x_DNS',
+                                                   'grad_c_y_DNS',
+                                                   'grad_c_z_DNS',
+                                                   'omega_DNS_filtered',
+                                                   'omega_model_planar',
+                                                   'Xi_iso_085',
+                                                   'U_bar',
+                                                   'V_bar',
+                                                   'W_bar',
+                                                   'U_prime',
+                                                   'V_prime',
+                                                   'W_prime',
+                                                   'grad_U_x_LES',
+                                                   'grad_V_x_LES',
+                                                   'grad_W_x_LES',
+                                                   'grad_U_y_LES',
+                                                   'grad_V_y_LES',
+                                                   'grad_W_y_LES',
+                                                   'grad_U_z_LES',
+                                                   'grad_V_z_LES',
+                                                   'grad_W_z_LES',
+                                                   'grad_U_x_DNS',
+                                                   'grad_V_x_DNS',
+                                                   'grad_W_x_DNS',
+                                                   'grad_U_y_DNS',
+                                                   'grad_V_y_DNS',
+                                                   'grad_W_y_DNS',
+                                                   'grad_U_z_DNS',
+                                                   'grad_V_z_DNS',
+                                                   'grad_W_z_DNS',
+                                                   ])
+
+        # # filter the data set and remove unecessary entries
+        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
+        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.999]
+        #
+        # dataArray_dd = dataArray_dd[dataArray_dd['grad_U'] != 0.0]
+
+        print('Computing data array ...')
+        dataArray_df = dataArray_dd.compute()
+
+        print('Writing output to pickle ...')
+        dataArray_df.to_pickle(filename)
+        print('Data has been written.\n\n')
+
+
+    def run_analysis_UVW(self,filter_width ,filter_type, c_analytical=False):
+        return NotImplementedError
 

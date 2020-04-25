@@ -1,5 +1,7 @@
 # CYTHON Version to compute velocity gradients
 
+# use: cythonize -a -i compute_gradU_LES_4thO_cython.pyx
+
 #import cython
 import numpy as np
 cimport numpy as np
@@ -17,7 +19,7 @@ ctypedef np.float_t DTYPE_t
 @cython.boundscheck(False)
 @cython.wraparound(False)
 # cpdef or cdef does not matter in speed tests
-cpdef compute_gradU_LES_4thO_cython(float[:, :, ::1] U_bar, float[:, :, ::1] V_bar, float[:, :, ::1] W_bar, int Nx, int Ny, int Nz, float delta_x):
+cpdef compute_gradU_LES_4thO_cython(float[:, :, ::1] U_bar, float[:, :, ::1] V_bar, float[:, :, ::1] W_bar, int Nx, int Ny, int Nz, float delta_x, int filter_width):
     # '''
     # Compute the magnitude of the gradient of the DNS c-field, based on neighbour cells
     # 4th Order central differencing
@@ -37,17 +39,17 @@ cpdef compute_gradU_LES_4thO_cython(float[:, :, ::1] U_bar, float[:, :, ::1] V_b
     for l in range(2,Nx-2):
         for m in range(2,Ny-2):
             for n in range(2,Nz-2):
-                this_U_gradX = (-U_bar[l+2, m, n] + 8*U_bar[l+1,m, n] - 8*U_bar[l-1,m, n] + U_bar[l-2, m, n])/(12 * delta_x)
-                this_U_gradY = (-U_bar[l, m+2, n] + 8*U_bar[l,m+1, n] - 8*U_bar[l,m-1, n] + U_bar[l, m-2, n])/(12 * delta_x)
-                this_U_gradZ = (-U_bar[l, m, n+2] + 8*U_bar[l,m, n+1] - 8*U_bar[l,m, n-1] + U_bar[l, m, n+2])/(12 * delta_x)
+                this_U_gradX = (-U_bar[l+2*filter_width, m, n] + 8*U_bar[l+1*filter_width,m, n] - 8*U_bar[l-1*filter_width,m, n] + U_bar[l-2*filter_width, m, n])/(12 * delta_x*filter_width)
+                this_U_gradY = (-U_bar[l, m+2*filter_width, n] + 8*U_bar[l,m+1*filter_width, n] - 8*U_bar[l,m-1*filter_width, n] + U_bar[l, m-2*filter_width, n])/(12 * delta_x*filter_width)
+                this_U_gradZ = (-U_bar[l, m, n+2*filter_width] + 8*U_bar[l,m, n+1*filter_width] - 8*U_bar[l,m, n-1*filter_width] + U_bar[l, m, n-2*filter_width])/(12 * delta_x*filter_width)
 
-                this_V_gradX = (-V_bar[l+2, m, n] + 8*V_bar[l+1,m, n] - 8*V_bar[l-1,m, n] + V_bar[l-2, m, n])/(12 * delta_x)
-                this_V_gradY = (-V_bar[l, m+2, n] + 8*V_bar[l,m+1, n] - 8*V_bar[l,m-1, n] + V_bar[l, m-2, n])/(12 * delta_x)
-                this_V_gradZ = (-V_bar[l, m, n+2] + 8*V_bar[l,m, n+1] - 8*V_bar[l,m, n-1] + V_bar[l, m, n+2])/(12 * delta_x)
+                this_V_gradX = (-V_bar[l+2*filter_width, m, n] + 8*V_bar[l+1*filter_width,m, n] - 8*V_bar[l-1*filter_width,m, n] + V_bar[l-2*filter_width, m, n])/(12 * delta_x*filter_width)
+                this_V_gradY = (-V_bar[l, m+2*filter_width, n] + 8*V_bar[l,m+1*filter_width, n] - 8*V_bar[l,m-1*filter_width n] + V_bar[l, m-2*filter_width, n])/(12 * delta_x*filter_width)
+                this_V_gradZ = (-V_bar[l, m, n+2*filter_width] + 8*V_bar[l,m, n+1*filter_width] - 8*V_bar[l,m, n-1*filter_width] + V_bar[l, m, n-2*filter_width])/(12 * delta_x*filter_width)
 
-                this_W_gradX = (-W_bar[l+2, m, n] + 8*W_bar[l+1,m, n] - 8*W_bar[l-1,m, n] + W_bar[l-2, m, n])/(12 * delta_x)
-                this_W_gradY = (-W_bar[l, m+2, n] + 8*W_bar[l,m+1, n] - 8*W_bar[l,m-1, n] + W_bar[l, m-2, n])/(12 * delta_x)
-                this_W_gradZ = (-W_bar[l, m, n+2] + 8*W_bar[l,m, n+1] - 8*W_bar[l,m, n-1] + W_bar[l, m, n+2])/(12 * delta_x)
+                this_W_gradX = (-W_bar[l+2*filter_width, m, n] + 8*W_bar[l+1*filter_width,m, n] - 8*W_bar[l-1*filter_width,m, n] + W_bar[l-2*filter_width, m, n])/(12 * delta_x*filter_width)
+                this_W_gradY = (-W_bar[l, m+2*filter_width, n] + 8*W_bar[l,m+1*filter_width, n] - 8*W_bar[l,m-1*filter_width, n] + W_bar[l, m-2*filter_width, n])/(12 * delta_x*filter_width)
+                this_W_gradZ = (-W_bar[l, m, n+2*filter_width] + 8*W_bar[l,m, n+1*filter_width] - 8*W_bar[l,m, n-1*filter_width] + W_bar[l, m, n-2*filter_width])/(12 * delta_x*filter_width)
 
                 # compute the magnitude of the gradient
                 this_magGrad_U = sqrt(this_U_gradX ** 2 + this_U_gradY ** 2 + this_U_gradZ ** 2)

@@ -4,12 +4,12 @@
 {
     "distutils": {
         "depends": [],
-        "name": "compute_DNS_grad_4thO_cython",
+        "name": "compute_LES_grad_4thO_tensor_cython",
         "sources": [
-            "/home/max/Python/DNS_Data_Klein/external_cython/compute_DNS_grad_4thO_cython.pyx"
+            "/home/max/Python/DNS_Data_Klein/external_cython/compute_LES_grad_4thO_tensor_cython.pyx"
         ]
     },
-    "module_name": "compute_DNS_grad_4thO_cython"
+    "module_name": "compute_LES_grad_4thO_tensor_cython"
 }
 END: Cython Metadata */
 
@@ -603,8 +603,8 @@ static CYTHON_INLINE float __PYX_NAN() {
   #endif
 #endif
 
-#define __PYX_HAVE__compute_DNS_grad_4thO_cython
-#define __PYX_HAVE_API__compute_DNS_grad_4thO_cython
+#define __PYX_HAVE__compute_LES_grad_4thO_tensor_cython
+#define __PYX_HAVE_API__compute_LES_grad_4thO_tensor_cython
 /* Early includes */
 #include <string.h>
 #include <stdio.h>
@@ -844,7 +844,7 @@ static const char *__pyx_filename;
 
 
 static const char *__pyx_f[] = {
-  "compute_DNS_grad_4thO_cython.pyx",
+  "compute_LES_grad_4thO_tensor_cython.pyx",
   "__init__.pxd",
   "stringsource",
   "type.pxd",
@@ -1147,14 +1147,14 @@ typedef npy_double __pyx_t_5numpy_double_t;
  */
 typedef npy_longdouble __pyx_t_5numpy_longdouble_t;
 
-/* "compute_DNS_grad_4thO_cython.pyx":16
+/* "compute_LES_grad_4thO_tensor_cython.pyx":16
  * #################
  * DTYPE = np.float32
  * ctypedef np.float_t DTYPE_t             # <<<<<<<<<<<<<<
  * 
  * 
  */
-typedef __pyx_t_5numpy_float_t __pyx_t_28compute_DNS_grad_4thO_cython_DTYPE_t;
+typedef __pyx_t_5numpy_float_t __pyx_t_35compute_LES_grad_4thO_tensor_cython_DTYPE_t;
 /* Declarations.proto */
 #if CYTHON_CCOMPLEX
   #ifdef __cplusplus
@@ -2130,7 +2130,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *, cha
 
 /* Module declarations from 'libc.math' */
 
-/* Module declarations from 'compute_DNS_grad_4thO_cython' */
+/* Module declarations from 'compute_LES_grad_4thO_tensor_cython' */
 static PyTypeObject *__pyx_array_type = 0;
 static PyTypeObject *__pyx_MemviewEnum_type = 0;
 static PyTypeObject *__pyx_memoryview_type = 0;
@@ -2142,7 +2142,7 @@ static PyObject *contiguous = 0;
 static PyObject *indirect_contiguous = 0;
 static int __pyx_memoryview_thread_locks_used;
 static PyThread_type_lock __pyx_memoryview_thread_locks[8];
-static PyObject *__pyx_f_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cython(__Pyx_memviewslice, int, int, int, float, int __pyx_skip_dispatch); /*proto*/
+static PyObject *__pyx_f_35compute_LES_grad_4thO_tensor_cython_compute_LES_grad_4thO_tensor_cython(__Pyx_memviewslice, int, int, int, float, int, int __pyx_skip_dispatch); /*proto*/
 static struct __pyx_array_obj *__pyx_array_new(PyObject *, Py_ssize_t, char *, char *, char *); /*proto*/
 static void *__pyx_align_pointer(void *, size_t); /*proto*/
 static PyObject *__pyx_memoryview_new(PyObject *, int, int, __Pyx_TypeInfo *); /*proto*/
@@ -2177,11 +2177,11 @@ static void __pyx_memoryview_slice_assign_scalar(__Pyx_memviewslice *, int, size
 static void __pyx_memoryview__slice_assign_scalar(char *, Py_ssize_t *, Py_ssize_t *, int, size_t, void *); /*proto*/
 static PyObject *__pyx_unpickle_Enum__set_state(struct __pyx_MemviewEnum_obj *, PyObject *); /*proto*/
 static __Pyx_TypeInfo __Pyx_TypeInfo_float = { "float", NULL, sizeof(float), { 0 }, 0, 'R', 0, 0 };
-#define __Pyx_MODULE_NAME "compute_DNS_grad_4thO_cython"
-extern int __pyx_module_is_main_compute_DNS_grad_4thO_cython;
-int __pyx_module_is_main_compute_DNS_grad_4thO_cython = 0;
+#define __Pyx_MODULE_NAME "compute_LES_grad_4thO_tensor_cython"
+extern int __pyx_module_is_main_compute_LES_grad_4thO_tensor_cython;
+int __pyx_module_is_main_compute_LES_grad_4thO_tensor_cython = 0;
 
-/* Implementation of 'compute_DNS_grad_4thO_cython' */
+/* Implementation of 'compute_LES_grad_4thO_tensor_cython' */
 static PyObject *__pyx_builtin_range;
 static PyObject *__pyx_builtin_ValueError;
 static PyObject *__pyx_builtin_RuntimeError;
@@ -2254,6 +2254,7 @@ static const char __pyx_k_ImportError[] = "ImportError";
 static const char __pyx_k_MemoryError[] = "MemoryError";
 static const char __pyx_k_PickleError[] = "PickleError";
 static const char __pyx_k_RuntimeError[] = "RuntimeError";
+static const char __pyx_k_filter_width[] = "filter_width";
 static const char __pyx_k_pyx_checksum[] = "__pyx_checksum";
 static const char __pyx_k_stringsource[] = "stringsource";
 static const char __pyx_k_pyx_getbuffer[] = "__pyx_getbuffer";
@@ -2345,6 +2346,7 @@ static PyObject *__pyx_n_s_encode;
 static PyObject *__pyx_n_s_enumerate;
 static PyObject *__pyx_n_s_error;
 static PyObject *__pyx_n_s_field;
+static PyObject *__pyx_n_s_filter_width;
 static PyObject *__pyx_n_s_flags;
 static PyObject *__pyx_n_s_float32;
 static PyObject *__pyx_n_s_format;
@@ -2404,7 +2406,7 @@ static PyObject *__pyx_kp_u_unknown_dtype_code_in_numpy_pxd;
 static PyObject *__pyx_n_s_unpack;
 static PyObject *__pyx_n_s_update;
 static PyObject *__pyx_n_s_zeros;
-static PyObject *__pyx_pf_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cython(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_field, int __pyx_v_Nx, int __pyx_v_Ny, int __pyx_v_Nz, float __pyx_v_delta_x); /* proto */
+static PyObject *__pyx_pf_35compute_LES_grad_4thO_tensor_cython_compute_LES_grad_4thO_tensor_cython(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_field, int __pyx_v_Nx, int __pyx_v_Ny, int __pyx_v_Nz, float __pyx_v_delta_x, int __pyx_v_filter_width); /* proto */
 static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
@@ -2455,7 +2457,6 @@ static PyObject *__pyx_tp_new_memoryview(PyTypeObject *t, PyObject *a, PyObject 
 static PyObject *__pyx_tp_new__memoryviewslice(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
 static PyObject *__pyx_int_0;
 static PyObject *__pyx_int_1;
-static PyObject *__pyx_int_2;
 static PyObject *__pyx_int_184977713;
 static PyObject *__pyx_int_neg_1;
 static PyObject *__pyx_tuple_;
@@ -2492,24 +2493,22 @@ static PyObject *__pyx_tuple__31;
 static PyObject *__pyx_codeobj__32;
 /* Late includes */
 
-/* "compute_DNS_grad_4thO_cython.pyx":22
+/* "compute_LES_grad_4thO_tensor_cython.pyx":22
  * @cython.wraparound(False)
  * # cpdef or cdef does not matter in speed tests
- * cpdef compute_DNS_grad_4thO_cython(float[:, :, ::1] field, int Nx, int Ny, int Nz, float delta_x):             # <<<<<<<<<<<<<<
+ * cpdef compute_LES_grad_4thO_tensor_cython(float[:, :, ::1] field, int Nx, int Ny, int Nz, float delta_x, int filter_width):             # <<<<<<<<<<<<<<
  *     # '''
  *     # Compute the magnitude of the gradient of a field on the DNS grid, based on neighbour cells
  */
 
-static PyObject *__pyx_pw_28compute_DNS_grad_4thO_cython_1compute_DNS_grad_4thO_cython(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyObject *__pyx_f_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cython(__Pyx_memviewslice __pyx_v_field, int __pyx_v_Nx, int __pyx_v_Ny, int __pyx_v_Nz, float __pyx_v_delta_x, CYTHON_UNUSED int __pyx_skip_dispatch) {
+static PyObject *__pyx_pw_35compute_LES_grad_4thO_tensor_cython_1compute_LES_grad_4thO_tensor_cython(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_f_35compute_LES_grad_4thO_tensor_cython_compute_LES_grad_4thO_tensor_cython(__Pyx_memviewslice __pyx_v_field, int __pyx_v_Nx, int __pyx_v_Ny, int __pyx_v_Nz, float __pyx_v_delta_x, int __pyx_v_filter_width, CYTHON_UNUSED int __pyx_skip_dispatch) {
   unsigned int __pyx_v_l;
   unsigned int __pyx_v_m;
   unsigned int __pyx_v_n;
-  __Pyx_memviewslice __pyx_v_grad_on_DNS = { 0, 0, { 0 }, { 0 }, { 0 } };
-  PyObject *__pyx_v_this_U_gradX = NULL;
-  PyObject *__pyx_v_this_U_gradY = NULL;
-  PyObject *__pyx_v_this_U_gradZ = NULL;
-  double __pyx_v_this_magGrad_U;
+  __Pyx_memviewslice __pyx_v_grad_X = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_grad_Y = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_grad_Z = { 0, 0, { 0 }, { 0 }, { 0 } };
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -2542,7 +2541,7 @@ static PyObject *__pyx_f_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cy
   float __pyx_t_28;
   float __pyx_t_29;
   size_t __pyx_t_30;
-  Py_ssize_t __pyx_t_31;
+  size_t __pyx_t_31;
   size_t __pyx_t_32;
   size_t __pyx_t_33;
   Py_ssize_t __pyx_t_34;
@@ -2554,29 +2553,34 @@ static PyObject *__pyx_f_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cy
   Py_ssize_t __pyx_t_40;
   size_t __pyx_t_41;
   size_t __pyx_t_42;
-  size_t __pyx_t_43;
-  Py_ssize_t __pyx_t_44;
+  Py_ssize_t __pyx_t_43;
+  size_t __pyx_t_44;
   size_t __pyx_t_45;
   size_t __pyx_t_46;
-  Py_ssize_t __pyx_t_47;
+  size_t __pyx_t_47;
   size_t __pyx_t_48;
   size_t __pyx_t_49;
   Py_ssize_t __pyx_t_50;
   size_t __pyx_t_51;
   size_t __pyx_t_52;
   Py_ssize_t __pyx_t_53;
-  double __pyx_t_54;
+  size_t __pyx_t_54;
   size_t __pyx_t_55;
-  size_t __pyx_t_56;
+  Py_ssize_t __pyx_t_56;
   size_t __pyx_t_57;
-  __Pyx_RefNannySetupContext("compute_DNS_grad_4thO_cython", 0);
+  size_t __pyx_t_58;
+  Py_ssize_t __pyx_t_59;
+  size_t __pyx_t_60;
+  size_t __pyx_t_61;
+  size_t __pyx_t_62;
+  __Pyx_RefNannySetupContext("compute_LES_grad_4thO_tensor_cython", 0);
 
-  /* "compute_DNS_grad_4thO_cython.pyx":32
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":32
  *     cdef unsigned int l, m, n
  * 
- *     cdef float[:, :,::1] grad_on_DNS = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero             # <<<<<<<<<<<<<<
- * 
- *     #print('Computing gradients of xi on DNS mesh 4th Order with Cython')
+ *     cdef float[:, :,::1] grad_X = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero             # <<<<<<<<<<<<<<
+ *     cdef float[:, :,::1] grad_Y = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero
+ *     cdef float[:, :,::1] grad_Z = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero
  */
   __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -2618,192 +2622,272 @@ static PyObject *__pyx_f_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cy
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_d_d_dc_float(__pyx_t_3, PyBUF_WRITABLE); if (unlikely(!__pyx_t_6.memview)) __PYX_ERR(0, 32, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_v_grad_on_DNS = __pyx_t_6;
+  __pyx_v_grad_X = __pyx_t_6;
   __pyx_t_6.memview = NULL;
   __pyx_t_6.data = NULL;
 
-  /* "compute_DNS_grad_4thO_cython.pyx":37
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":33
+ * 
+ *     cdef float[:, :,::1] grad_X = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero
+ *     cdef float[:, :,::1] grad_Y = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero             # <<<<<<<<<<<<<<
+ *     cdef float[:, :,::1] grad_Z = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero
+ * 
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_zeros); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_Nx); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_Ny); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_Nz); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_1 = PyList_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_GIVEREF(__pyx_t_3);
+  PyList_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_4);
+  PyList_SET_ITEM(__pyx_t_1, 1, __pyx_t_4);
+  __Pyx_GIVEREF(__pyx_t_2);
+  PyList_SET_ITEM(__pyx_t_1, 2, __pyx_t_2);
+  __pyx_t_3 = 0;
+  __pyx_t_4 = 0;
+  __pyx_t_2 = 0;
+  __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_GIVEREF(__pyx_t_1);
+  PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_1);
+  __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_5, __pyx_t_2, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_d_d_dc_float(__pyx_t_4, PyBUF_WRITABLE); if (unlikely(!__pyx_t_6.memview)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __pyx_v_grad_Y = __pyx_t_6;
+  __pyx_t_6.memview = NULL;
+  __pyx_t_6.data = NULL;
+
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":34
+ *     cdef float[:, :,::1] grad_X = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero
+ *     cdef float[:, :,::1] grad_Y = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero
+ *     cdef float[:, :,::1] grad_Z = np.zeros([Nx, Ny, Nz],dtype=DTYPE)  # set output array to zero             # <<<<<<<<<<<<<<
+ * 
+ *     #print('Computing gradients of xi on DNS mesh 4th Order with Cython')
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_Nx); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_Ny); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_Nz); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_3 = PyList_New(3); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_4);
+  PyList_SET_ITEM(__pyx_t_3, 0, __pyx_t_4);
+  __Pyx_GIVEREF(__pyx_t_2);
+  PyList_SET_ITEM(__pyx_t_3, 1, __pyx_t_2);
+  __Pyx_GIVEREF(__pyx_t_5);
+  PyList_SET_ITEM(__pyx_t_3, 2, __pyx_t_5);
+  __pyx_t_4 = 0;
+  __pyx_t_2 = 0;
+  __pyx_t_5 = 0;
+  __pyx_t_5 = PyTuple_New(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_GIVEREF(__pyx_t_3);
+  PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_3);
+  __pyx_t_3 = 0;
+  __pyx_t_3 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_2) < 0) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_5, __pyx_t_3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_d_d_dc_float(__pyx_t_2, PyBUF_WRITABLE); if (unlikely(!__pyx_t_6.memview)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_v_grad_Z = __pyx_t_6;
+  __pyx_t_6.memview = NULL;
+  __pyx_t_6.data = NULL;
+
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":39
  * 
  *     # compute gradients from the boundaries away ...
- *     for l in range(2,Nx-2):             # <<<<<<<<<<<<<<
- *         for m in range(2,Ny-2):
- *             for n in range(2,Nz-2):
+ *     for l in range(2*filter_width,Nx-2*filter_width):             # <<<<<<<<<<<<<<
+ *         for m in range(2*filter_width,Ny-2*filter_width):
+ *             for n in range(2*filter_width,Nz-2*filter_width):
  */
-  __pyx_t_7 = (__pyx_v_Nx - 2);
+  __pyx_t_7 = (__pyx_v_Nx - (2 * __pyx_v_filter_width));
   __pyx_t_8 = __pyx_t_7;
-  for (__pyx_t_9 = 2; __pyx_t_9 < __pyx_t_8; __pyx_t_9+=1) {
+  for (__pyx_t_9 = (2 * __pyx_v_filter_width); __pyx_t_9 < __pyx_t_8; __pyx_t_9+=1) {
     __pyx_v_l = __pyx_t_9;
 
-    /* "compute_DNS_grad_4thO_cython.pyx":38
+    /* "compute_LES_grad_4thO_tensor_cython.pyx":40
  *     # compute gradients from the boundaries away ...
- *     for l in range(2,Nx-2):
- *         for m in range(2,Ny-2):             # <<<<<<<<<<<<<<
- *             for n in range(2,Nz-2):
- *                 this_U_gradX = (-field[l+2, m, n] + 8*field[l+1,m, n] - 8*field[l-1,m, n] + field[l-2, m, n])/(12 * delta_x)
+ *     for l in range(2*filter_width,Nx-2*filter_width):
+ *         for m in range(2*filter_width,Ny-2*filter_width):             # <<<<<<<<<<<<<<
+ *             for n in range(2*filter_width,Nz-2*filter_width):
+ *                 grad_X[l,m,n] = (-field[l+2*filter_width, m, n] + 8*field[l+1*filter_width,m, n] - 8*field[l-1*filter_width,m, n] + field[l-2*filter_width, m, n])/(12 * filter_width* delta_x)
  */
-    __pyx_t_10 = (__pyx_v_Ny - 2);
+    __pyx_t_10 = (__pyx_v_Ny - (2 * __pyx_v_filter_width));
     __pyx_t_11 = __pyx_t_10;
-    for (__pyx_t_12 = 2; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
+    for (__pyx_t_12 = (2 * __pyx_v_filter_width); __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
       __pyx_v_m = __pyx_t_12;
 
-      /* "compute_DNS_grad_4thO_cython.pyx":39
- *     for l in range(2,Nx-2):
- *         for m in range(2,Ny-2):
- *             for n in range(2,Nz-2):             # <<<<<<<<<<<<<<
- *                 this_U_gradX = (-field[l+2, m, n] + 8*field[l+1,m, n] - 8*field[l-1,m, n] + field[l-2, m, n])/(12 * delta_x)
- *                 this_U_gradY = (-field[l, m+2, n] + 8*field[l,m+1, n] - 8*field[l,m-1, n] + field[l, m-2, n])/(12 * delta_x)
+      /* "compute_LES_grad_4thO_tensor_cython.pyx":41
+ *     for l in range(2*filter_width,Nx-2*filter_width):
+ *         for m in range(2*filter_width,Ny-2*filter_width):
+ *             for n in range(2*filter_width,Nz-2*filter_width):             # <<<<<<<<<<<<<<
+ *                 grad_X[l,m,n] = (-field[l+2*filter_width, m, n] + 8*field[l+1*filter_width,m, n] - 8*field[l-1*filter_width,m, n] + field[l-2*filter_width, m, n])/(12 * filter_width* delta_x)
+ *                 grad_Y[l,m,n] = (-field[l, m+2*filter_width, n] + 8*field[l,m+1*filter_width, n] - 8*field[l,m-1*filter_width, n] + field[l, m-2*filter_width, n])/(12 * filter_width* delta_x)
  */
-      __pyx_t_13 = (__pyx_v_Nz - 2);
+      __pyx_t_13 = (__pyx_v_Nz - (2 * __pyx_v_filter_width));
       __pyx_t_14 = __pyx_t_13;
-      for (__pyx_t_15 = 2; __pyx_t_15 < __pyx_t_14; __pyx_t_15+=1) {
+      for (__pyx_t_15 = (2 * __pyx_v_filter_width); __pyx_t_15 < __pyx_t_14; __pyx_t_15+=1) {
         __pyx_v_n = __pyx_t_15;
 
-        /* "compute_DNS_grad_4thO_cython.pyx":40
- *         for m in range(2,Ny-2):
- *             for n in range(2,Nz-2):
- *                 this_U_gradX = (-field[l+2, m, n] + 8*field[l+1,m, n] - 8*field[l-1,m, n] + field[l-2, m, n])/(12 * delta_x)             # <<<<<<<<<<<<<<
- *                 this_U_gradY = (-field[l, m+2, n] + 8*field[l,m+1, n] - 8*field[l,m-1, n] + field[l, m-2, n])/(12 * delta_x)
- *                 this_U_gradZ = (-field[l, m, n+2] + 8*field[l,m, n+1] - 8*field[l,m, n-1] + field[l, m, n-2])/(12 * delta_x)
+        /* "compute_LES_grad_4thO_tensor_cython.pyx":42
+ *         for m in range(2*filter_width,Ny-2*filter_width):
+ *             for n in range(2*filter_width,Nz-2*filter_width):
+ *                 grad_X[l,m,n] = (-field[l+2*filter_width, m, n] + 8*field[l+1*filter_width,m, n] - 8*field[l-1*filter_width,m, n] + field[l-2*filter_width, m, n])/(12 * filter_width* delta_x)             # <<<<<<<<<<<<<<
+ *                 grad_Y[l,m,n] = (-field[l, m+2*filter_width, n] + 8*field[l,m+1*filter_width, n] - 8*field[l,m-1*filter_width, n] + field[l, m-2*filter_width, n])/(12 * filter_width* delta_x)
+ *                 grad_Z[l,m,n] = (-field[l, m, n+2*filter_width] + 8*field[l,m, n+1*filter_width] - 8*field[l,m, n-1*filter_width] + field[l, m, n-2*filter_width])/(12 * filter_width* delta_x)
  */
-        __pyx_t_16 = (__pyx_v_l + 2);
+        __pyx_t_16 = (__pyx_v_l + (2 * __pyx_v_filter_width));
         __pyx_t_17 = __pyx_v_m;
         __pyx_t_18 = __pyx_v_n;
-        __pyx_t_19 = (__pyx_v_l + 1);
+        __pyx_t_19 = (__pyx_v_l + (1 * __pyx_v_filter_width));
         __pyx_t_20 = __pyx_v_m;
         __pyx_t_21 = __pyx_v_n;
-        __pyx_t_22 = (__pyx_v_l - 1);
+        __pyx_t_22 = (__pyx_v_l - (1 * __pyx_v_filter_width));
         __pyx_t_23 = __pyx_v_m;
         __pyx_t_24 = __pyx_v_n;
-        __pyx_t_25 = (__pyx_v_l - 2);
+        __pyx_t_25 = (__pyx_v_l - (2 * __pyx_v_filter_width));
         __pyx_t_26 = __pyx_v_m;
         __pyx_t_27 = __pyx_v_n;
         __pyx_t_28 = ((((-(*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_16 * __pyx_v_field.strides[0]) ) + __pyx_t_17 * __pyx_v_field.strides[1]) )) + __pyx_t_18)) )))) + (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_19 * __pyx_v_field.strides[0]) ) + __pyx_t_20 * __pyx_v_field.strides[1]) )) + __pyx_t_21)) ))))) - (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_22 * __pyx_v_field.strides[0]) ) + __pyx_t_23 * __pyx_v_field.strides[1]) )) + __pyx_t_24)) ))))) + (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_25 * __pyx_v_field.strides[0]) ) + __pyx_t_26 * __pyx_v_field.strides[1]) )) + __pyx_t_27)) ))));
-        __pyx_t_29 = (12.0 * __pyx_v_delta_x);
-        if (unlikely(__pyx_t_29 == 0)) {
-          PyErr_SetString(PyExc_ZeroDivisionError, "float division");
-          __PYX_ERR(0, 40, __pyx_L1_error)
-        }
-        __pyx_t_3 = PyFloat_FromDouble((__pyx_t_28 / __pyx_t_29)); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 40, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_3);
-        __Pyx_XDECREF_SET(__pyx_v_this_U_gradX, __pyx_t_3);
-        __pyx_t_3 = 0;
-
-        /* "compute_DNS_grad_4thO_cython.pyx":41
- *             for n in range(2,Nz-2):
- *                 this_U_gradX = (-field[l+2, m, n] + 8*field[l+1,m, n] - 8*field[l-1,m, n] + field[l-2, m, n])/(12 * delta_x)
- *                 this_U_gradY = (-field[l, m+2, n] + 8*field[l,m+1, n] - 8*field[l,m-1, n] + field[l, m-2, n])/(12 * delta_x)             # <<<<<<<<<<<<<<
- *                 this_U_gradZ = (-field[l, m, n+2] + 8*field[l,m, n+1] - 8*field[l,m, n-1] + field[l, m, n-2])/(12 * delta_x)
- * 
- */
-        __pyx_t_30 = __pyx_v_l;
-        __pyx_t_31 = (__pyx_v_m + 2);
-        __pyx_t_32 = __pyx_v_n;
-        __pyx_t_33 = __pyx_v_l;
-        __pyx_t_34 = (__pyx_v_m + 1);
-        __pyx_t_35 = __pyx_v_n;
-        __pyx_t_36 = __pyx_v_l;
-        __pyx_t_37 = (__pyx_v_m - 1);
-        __pyx_t_38 = __pyx_v_n;
-        __pyx_t_39 = __pyx_v_l;
-        __pyx_t_40 = (__pyx_v_m - 2);
-        __pyx_t_41 = __pyx_v_n;
-        __pyx_t_29 = ((((-(*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_30 * __pyx_v_field.strides[0]) ) + __pyx_t_31 * __pyx_v_field.strides[1]) )) + __pyx_t_32)) )))) + (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_33 * __pyx_v_field.strides[0]) ) + __pyx_t_34 * __pyx_v_field.strides[1]) )) + __pyx_t_35)) ))))) - (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_36 * __pyx_v_field.strides[0]) ) + __pyx_t_37 * __pyx_v_field.strides[1]) )) + __pyx_t_38)) ))))) + (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_39 * __pyx_v_field.strides[0]) ) + __pyx_t_40 * __pyx_v_field.strides[1]) )) + __pyx_t_41)) ))));
-        __pyx_t_28 = (12.0 * __pyx_v_delta_x);
-        if (unlikely(__pyx_t_28 == 0)) {
-          PyErr_SetString(PyExc_ZeroDivisionError, "float division");
-          __PYX_ERR(0, 41, __pyx_L1_error)
-        }
-        __pyx_t_3 = PyFloat_FromDouble((__pyx_t_29 / __pyx_t_28)); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 41, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_3);
-        __Pyx_XDECREF_SET(__pyx_v_this_U_gradY, __pyx_t_3);
-        __pyx_t_3 = 0;
-
-        /* "compute_DNS_grad_4thO_cython.pyx":42
- *                 this_U_gradX = (-field[l+2, m, n] + 8*field[l+1,m, n] - 8*field[l-1,m, n] + field[l-2, m, n])/(12 * delta_x)
- *                 this_U_gradY = (-field[l, m+2, n] + 8*field[l,m+1, n] - 8*field[l,m-1, n] + field[l, m-2, n])/(12 * delta_x)
- *                 this_U_gradZ = (-field[l, m, n+2] + 8*field[l,m, n+1] - 8*field[l,m, n-1] + field[l, m, n-2])/(12 * delta_x)             # <<<<<<<<<<<<<<
- * 
- *                 # compute the magnitude of the gradient
- */
-        __pyx_t_42 = __pyx_v_l;
-        __pyx_t_43 = __pyx_v_m;
-        __pyx_t_44 = (__pyx_v_n + 2);
-        __pyx_t_45 = __pyx_v_l;
-        __pyx_t_46 = __pyx_v_m;
-        __pyx_t_47 = (__pyx_v_n + 1);
-        __pyx_t_48 = __pyx_v_l;
-        __pyx_t_49 = __pyx_v_m;
-        __pyx_t_50 = (__pyx_v_n - 1);
-        __pyx_t_51 = __pyx_v_l;
-        __pyx_t_52 = __pyx_v_m;
-        __pyx_t_53 = (__pyx_v_n - 2);
-        __pyx_t_28 = ((((-(*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_42 * __pyx_v_field.strides[0]) ) + __pyx_t_43 * __pyx_v_field.strides[1]) )) + __pyx_t_44)) )))) + (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_45 * __pyx_v_field.strides[0]) ) + __pyx_t_46 * __pyx_v_field.strides[1]) )) + __pyx_t_47)) ))))) - (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_48 * __pyx_v_field.strides[0]) ) + __pyx_t_49 * __pyx_v_field.strides[1]) )) + __pyx_t_50)) ))))) + (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_51 * __pyx_v_field.strides[0]) ) + __pyx_t_52 * __pyx_v_field.strides[1]) )) + __pyx_t_53)) ))));
-        __pyx_t_29 = (12.0 * __pyx_v_delta_x);
+        __pyx_t_29 = ((12 * __pyx_v_filter_width) * __pyx_v_delta_x);
         if (unlikely(__pyx_t_29 == 0)) {
           PyErr_SetString(PyExc_ZeroDivisionError, "float division");
           __PYX_ERR(0, 42, __pyx_L1_error)
         }
-        __pyx_t_3 = PyFloat_FromDouble((__pyx_t_28 / __pyx_t_29)); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 42, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_3);
-        __Pyx_XDECREF_SET(__pyx_v_this_U_gradZ, __pyx_t_3);
-        __pyx_t_3 = 0;
+        __pyx_t_30 = __pyx_v_l;
+        __pyx_t_31 = __pyx_v_m;
+        __pyx_t_32 = __pyx_v_n;
+        *((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_grad_X.data + __pyx_t_30 * __pyx_v_grad_X.strides[0]) ) + __pyx_t_31 * __pyx_v_grad_X.strides[1]) )) + __pyx_t_32)) )) = (__pyx_t_28 / __pyx_t_29);
 
-        /* "compute_DNS_grad_4thO_cython.pyx":45
+        /* "compute_LES_grad_4thO_tensor_cython.pyx":43
+ *             for n in range(2*filter_width,Nz-2*filter_width):
+ *                 grad_X[l,m,n] = (-field[l+2*filter_width, m, n] + 8*field[l+1*filter_width,m, n] - 8*field[l-1*filter_width,m, n] + field[l-2*filter_width, m, n])/(12 * filter_width* delta_x)
+ *                 grad_Y[l,m,n] = (-field[l, m+2*filter_width, n] + 8*field[l,m+1*filter_width, n] - 8*field[l,m-1*filter_width, n] + field[l, m-2*filter_width, n])/(12 * filter_width* delta_x)             # <<<<<<<<<<<<<<
+ *                 grad_Z[l,m,n] = (-field[l, m, n+2*filter_width] + 8*field[l,m, n+1*filter_width] - 8*field[l,m, n-1*filter_width] + field[l, m, n-2*filter_width])/(12 * filter_width* delta_x)
  * 
- *                 # compute the magnitude of the gradient
- *                 this_magGrad_U = sqrt(this_U_gradX ** 2 + this_U_gradY ** 2 + this_U_gradZ ** 2)             # <<<<<<<<<<<<<<
- * 
- *                 grad_on_DNS[l, m, n] = this_magGrad_U
  */
-        __pyx_t_3 = PyNumber_Power(__pyx_v_this_U_gradX, __pyx_int_2, Py_None); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 45, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_3);
-        __pyx_t_5 = PyNumber_Power(__pyx_v_this_U_gradY, __pyx_int_2, Py_None); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 45, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_5);
-        __pyx_t_4 = PyNumber_Add(__pyx_t_3, __pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 45, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_4);
-        __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-        __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-        __pyx_t_5 = PyNumber_Power(__pyx_v_this_U_gradZ, __pyx_int_2, Py_None); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 45, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_5);
-        __pyx_t_3 = PyNumber_Add(__pyx_t_4, __pyx_t_5); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 45, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_3);
-        __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-        __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-        __pyx_t_54 = __pyx_PyFloat_AsDouble(__pyx_t_3); if (unlikely((__pyx_t_54 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 45, __pyx_L1_error)
-        __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-        __pyx_v_this_magGrad_U = sqrt(__pyx_t_54);
+        __pyx_t_33 = __pyx_v_l;
+        __pyx_t_34 = (__pyx_v_m + (2 * __pyx_v_filter_width));
+        __pyx_t_35 = __pyx_v_n;
+        __pyx_t_36 = __pyx_v_l;
+        __pyx_t_37 = (__pyx_v_m + (1 * __pyx_v_filter_width));
+        __pyx_t_38 = __pyx_v_n;
+        __pyx_t_39 = __pyx_v_l;
+        __pyx_t_40 = (__pyx_v_m - (1 * __pyx_v_filter_width));
+        __pyx_t_41 = __pyx_v_n;
+        __pyx_t_42 = __pyx_v_l;
+        __pyx_t_43 = (__pyx_v_m - (2 * __pyx_v_filter_width));
+        __pyx_t_44 = __pyx_v_n;
+        __pyx_t_29 = ((((-(*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_33 * __pyx_v_field.strides[0]) ) + __pyx_t_34 * __pyx_v_field.strides[1]) )) + __pyx_t_35)) )))) + (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_36 * __pyx_v_field.strides[0]) ) + __pyx_t_37 * __pyx_v_field.strides[1]) )) + __pyx_t_38)) ))))) - (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_39 * __pyx_v_field.strides[0]) ) + __pyx_t_40 * __pyx_v_field.strides[1]) )) + __pyx_t_41)) ))))) + (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_42 * __pyx_v_field.strides[0]) ) + __pyx_t_43 * __pyx_v_field.strides[1]) )) + __pyx_t_44)) ))));
+        __pyx_t_28 = ((12 * __pyx_v_filter_width) * __pyx_v_delta_x);
+        if (unlikely(__pyx_t_28 == 0)) {
+          PyErr_SetString(PyExc_ZeroDivisionError, "float division");
+          __PYX_ERR(0, 43, __pyx_L1_error)
+        }
+        __pyx_t_45 = __pyx_v_l;
+        __pyx_t_46 = __pyx_v_m;
+        __pyx_t_47 = __pyx_v_n;
+        *((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_grad_Y.data + __pyx_t_45 * __pyx_v_grad_Y.strides[0]) ) + __pyx_t_46 * __pyx_v_grad_Y.strides[1]) )) + __pyx_t_47)) )) = (__pyx_t_29 / __pyx_t_28);
 
-        /* "compute_DNS_grad_4thO_cython.pyx":47
- *                 this_magGrad_U = sqrt(this_U_gradX ** 2 + this_U_gradY ** 2 + this_U_gradZ ** 2)
+        /* "compute_LES_grad_4thO_tensor_cython.pyx":44
+ *                 grad_X[l,m,n] = (-field[l+2*filter_width, m, n] + 8*field[l+1*filter_width,m, n] - 8*field[l-1*filter_width,m, n] + field[l-2*filter_width, m, n])/(12 * filter_width* delta_x)
+ *                 grad_Y[l,m,n] = (-field[l, m+2*filter_width, n] + 8*field[l,m+1*filter_width, n] - 8*field[l,m-1*filter_width, n] + field[l, m-2*filter_width, n])/(12 * filter_width* delta_x)
+ *                 grad_Z[l,m,n] = (-field[l, m, n+2*filter_width] + 8*field[l,m, n+1*filter_width] - 8*field[l,m, n-1*filter_width] + field[l, m, n-2*filter_width])/(12 * filter_width* delta_x)             # <<<<<<<<<<<<<<
  * 
- *                 grad_on_DNS[l, m, n] = this_magGrad_U             # <<<<<<<<<<<<<<
- * 
- *     return grad_on_DNS
+ *     return grad_X, grad_Y, grad_Z
  */
-        __pyx_t_55 = __pyx_v_l;
-        __pyx_t_56 = __pyx_v_m;
-        __pyx_t_57 = __pyx_v_n;
-        *((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_grad_on_DNS.data + __pyx_t_55 * __pyx_v_grad_on_DNS.strides[0]) ) + __pyx_t_56 * __pyx_v_grad_on_DNS.strides[1]) )) + __pyx_t_57)) )) = __pyx_v_this_magGrad_U;
+        __pyx_t_48 = __pyx_v_l;
+        __pyx_t_49 = __pyx_v_m;
+        __pyx_t_50 = (__pyx_v_n + (2 * __pyx_v_filter_width));
+        __pyx_t_51 = __pyx_v_l;
+        __pyx_t_52 = __pyx_v_m;
+        __pyx_t_53 = (__pyx_v_n + (1 * __pyx_v_filter_width));
+        __pyx_t_54 = __pyx_v_l;
+        __pyx_t_55 = __pyx_v_m;
+        __pyx_t_56 = (__pyx_v_n - (1 * __pyx_v_filter_width));
+        __pyx_t_57 = __pyx_v_l;
+        __pyx_t_58 = __pyx_v_m;
+        __pyx_t_59 = (__pyx_v_n - (2 * __pyx_v_filter_width));
+        __pyx_t_28 = ((((-(*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_48 * __pyx_v_field.strides[0]) ) + __pyx_t_49 * __pyx_v_field.strides[1]) )) + __pyx_t_50)) )))) + (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_51 * __pyx_v_field.strides[0]) ) + __pyx_t_52 * __pyx_v_field.strides[1]) )) + __pyx_t_53)) ))))) - (8.0 * (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_54 * __pyx_v_field.strides[0]) ) + __pyx_t_55 * __pyx_v_field.strides[1]) )) + __pyx_t_56)) ))))) + (*((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_field.data + __pyx_t_57 * __pyx_v_field.strides[0]) ) + __pyx_t_58 * __pyx_v_field.strides[1]) )) + __pyx_t_59)) ))));
+        __pyx_t_29 = ((12 * __pyx_v_filter_width) * __pyx_v_delta_x);
+        if (unlikely(__pyx_t_29 == 0)) {
+          PyErr_SetString(PyExc_ZeroDivisionError, "float division");
+          __PYX_ERR(0, 44, __pyx_L1_error)
+        }
+        __pyx_t_60 = __pyx_v_l;
+        __pyx_t_61 = __pyx_v_m;
+        __pyx_t_62 = __pyx_v_n;
+        *((float *) ( /* dim=2 */ ((char *) (((float *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_grad_Z.data + __pyx_t_60 * __pyx_v_grad_Z.strides[0]) ) + __pyx_t_61 * __pyx_v_grad_Z.strides[1]) )) + __pyx_t_62)) )) = (__pyx_t_28 / __pyx_t_29);
       }
     }
   }
 
-  /* "compute_DNS_grad_4thO_cython.pyx":49
- *                 grad_on_DNS[l, m, n] = this_magGrad_U
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":46
+ *                 grad_Z[l,m,n] = (-field[l, m, n+2*filter_width] + 8*field[l,m, n+1*filter_width] - 8*field[l,m, n-1*filter_width] + field[l, m, n-2*filter_width])/(12 * filter_width* delta_x)
  * 
- *     return grad_on_DNS             # <<<<<<<<<<<<<<
+ *     return grad_X, grad_Y, grad_Z             # <<<<<<<<<<<<<<
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_v_grad_on_DNS, 3, (PyObject *(*)(char *)) __pyx_memview_get_float, (int (*)(char *, PyObject *)) __pyx_memview_set_float, 0);; if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 49, __pyx_L1_error)
+  __pyx_t_2 = __pyx_memoryview_fromslice(__pyx_v_grad_X, 3, (PyObject *(*)(char *)) __pyx_memview_get_float, (int (*)(char *, PyObject *)) __pyx_memview_set_float, 0);; if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_v_grad_Y, 3, (PyObject *(*)(char *)) __pyx_memview_get_float, (int (*)(char *, PyObject *)) __pyx_memview_set_float, 0);; if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 46, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_r = __pyx_t_3;
+  __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_v_grad_Z, 3, (PyObject *(*)(char *)) __pyx_memview_get_float, (int (*)(char *, PyObject *)) __pyx_memview_set_float, 0);; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_GIVEREF(__pyx_t_2);
+  PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_2);
+  __Pyx_GIVEREF(__pyx_t_3);
+  PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_5);
+  PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_t_5);
+  __pyx_t_2 = 0;
   __pyx_t_3 = 0;
+  __pyx_t_5 = 0;
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "compute_DNS_grad_4thO_cython.pyx":22
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":22
  * @cython.wraparound(False)
  * # cpdef or cdef does not matter in speed tests
- * cpdef compute_DNS_grad_4thO_cython(float[:, :, ::1] field, int Nx, int Ny, int Nz, float delta_x):             # <<<<<<<<<<<<<<
+ * cpdef compute_LES_grad_4thO_tensor_cython(float[:, :, ::1] field, int Nx, int Ny, int Nz, float delta_x, int filter_width):             # <<<<<<<<<<<<<<
  *     # '''
  *     # Compute the magnitude of the gradient of a field on the DNS grid, based on neighbour cells
  */
@@ -2816,36 +2900,38 @@ static PyObject *__pyx_f_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cy
   __Pyx_XDECREF(__pyx_t_4);
   __Pyx_XDECREF(__pyx_t_5);
   __PYX_XDEC_MEMVIEW(&__pyx_t_6, 1);
-  __Pyx_AddTraceback("compute_DNS_grad_4thO_cython.compute_DNS_grad_4thO_cython", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("compute_LES_grad_4thO_tensor_cython.compute_LES_grad_4thO_tensor_cython", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = 0;
   __pyx_L0:;
-  __PYX_XDEC_MEMVIEW(&__pyx_v_grad_on_DNS, 1);
-  __Pyx_XDECREF(__pyx_v_this_U_gradX);
-  __Pyx_XDECREF(__pyx_v_this_U_gradY);
-  __Pyx_XDECREF(__pyx_v_this_U_gradZ);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_grad_X, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_grad_Y, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_grad_Z, 1);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
 /* Python wrapper */
-static PyObject *__pyx_pw_28compute_DNS_grad_4thO_cython_1compute_DNS_grad_4thO_cython(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyObject *__pyx_pw_28compute_DNS_grad_4thO_cython_1compute_DNS_grad_4thO_cython(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_35compute_LES_grad_4thO_tensor_cython_1compute_LES_grad_4thO_tensor_cython(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_35compute_LES_grad_4thO_tensor_cython_1compute_LES_grad_4thO_tensor_cython(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   __Pyx_memviewslice __pyx_v_field = { 0, 0, { 0 }, { 0 }, { 0 } };
   int __pyx_v_Nx;
   int __pyx_v_Ny;
   int __pyx_v_Nz;
   float __pyx_v_delta_x;
+  int __pyx_v_filter_width;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("compute_DNS_grad_4thO_cython (wrapper)", 0);
+  __Pyx_RefNannySetupContext("compute_LES_grad_4thO_tensor_cython (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_field,&__pyx_n_s_Nx,&__pyx_n_s_Ny,&__pyx_n_s_Nz,&__pyx_n_s_delta_x,0};
-    PyObject* values[5] = {0,0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_field,&__pyx_n_s_Nx,&__pyx_n_s_Ny,&__pyx_n_s_Nz,&__pyx_n_s_delta_x,&__pyx_n_s_filter_width,0};
+    PyObject* values[6] = {0,0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        CYTHON_FALLTHROUGH;
         case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
         CYTHON_FALLTHROUGH;
         case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
@@ -2868,31 +2954,37 @@ static PyObject *__pyx_pw_28compute_DNS_grad_4thO_cython_1compute_DNS_grad_4thO_
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_Nx)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("compute_DNS_grad_4thO_cython", 1, 5, 5, 1); __PYX_ERR(0, 22, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("compute_LES_grad_4thO_tensor_cython", 1, 6, 6, 1); __PYX_ERR(0, 22, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_Ny)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("compute_DNS_grad_4thO_cython", 1, 5, 5, 2); __PYX_ERR(0, 22, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("compute_LES_grad_4thO_tensor_cython", 1, 6, 6, 2); __PYX_ERR(0, 22, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_Nz)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("compute_DNS_grad_4thO_cython", 1, 5, 5, 3); __PYX_ERR(0, 22, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("compute_LES_grad_4thO_tensor_cython", 1, 6, 6, 3); __PYX_ERR(0, 22, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  4:
         if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_delta_x)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("compute_DNS_grad_4thO_cython", 1, 5, 5, 4); __PYX_ERR(0, 22, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("compute_LES_grad_4thO_tensor_cython", 1, 6, 6, 4); __PYX_ERR(0, 22, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  5:
+        if (likely((values[5] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_filter_width)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("compute_LES_grad_4thO_tensor_cython", 1, 6, 6, 5); __PYX_ERR(0, 22, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "compute_DNS_grad_4thO_cython") < 0)) __PYX_ERR(0, 22, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "compute_LES_grad_4thO_tensor_cython") < 0)) __PYX_ERR(0, 22, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 5) {
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 6) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
@@ -2900,36 +2992,38 @@ static PyObject *__pyx_pw_28compute_DNS_grad_4thO_cython_1compute_DNS_grad_4thO_
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
       values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
       values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+      values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
     }
     __pyx_v_field = __Pyx_PyObject_to_MemoryviewSlice_d_d_dc_float(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_field.memview)) __PYX_ERR(0, 22, __pyx_L3_error)
     __pyx_v_Nx = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_Nx == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 22, __pyx_L3_error)
     __pyx_v_Ny = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_Ny == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 22, __pyx_L3_error)
     __pyx_v_Nz = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_Nz == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 22, __pyx_L3_error)
     __pyx_v_delta_x = __pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_delta_x == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 22, __pyx_L3_error)
+    __pyx_v_filter_width = __Pyx_PyInt_As_int(values[5]); if (unlikely((__pyx_v_filter_width == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 22, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("compute_DNS_grad_4thO_cython", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 22, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("compute_LES_grad_4thO_tensor_cython", 1, 6, 6, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 22, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("compute_DNS_grad_4thO_cython.compute_DNS_grad_4thO_cython", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("compute_LES_grad_4thO_tensor_cython.compute_LES_grad_4thO_tensor_cython", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cython(__pyx_self, __pyx_v_field, __pyx_v_Nx, __pyx_v_Ny, __pyx_v_Nz, __pyx_v_delta_x);
+  __pyx_r = __pyx_pf_35compute_LES_grad_4thO_tensor_cython_compute_LES_grad_4thO_tensor_cython(__pyx_self, __pyx_v_field, __pyx_v_Nx, __pyx_v_Ny, __pyx_v_Nz, __pyx_v_delta_x, __pyx_v_filter_width);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cython(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_field, int __pyx_v_Nx, int __pyx_v_Ny, int __pyx_v_Nz, float __pyx_v_delta_x) {
+static PyObject *__pyx_pf_35compute_LES_grad_4thO_tensor_cython_compute_LES_grad_4thO_tensor_cython(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_field, int __pyx_v_Nx, int __pyx_v_Ny, int __pyx_v_Nz, float __pyx_v_delta_x, int __pyx_v_filter_width) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
-  __Pyx_RefNannySetupContext("compute_DNS_grad_4thO_cython", 0);
+  __Pyx_RefNannySetupContext("compute_LES_grad_4thO_tensor_cython", 0);
   __Pyx_XDECREF(__pyx_r);
   if (unlikely(!__pyx_v_field.memview)) { __Pyx_RaiseUnboundLocalError("field"); __PYX_ERR(0, 22, __pyx_L1_error) }
-  __pyx_t_1 = __pyx_f_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_cython(__pyx_v_field, __pyx_v_Nx, __pyx_v_Ny, __pyx_v_Nz, __pyx_v_delta_x, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 22, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_35compute_LES_grad_4thO_tensor_cython_compute_LES_grad_4thO_tensor_cython(__pyx_v_field, __pyx_v_Nx, __pyx_v_Ny, __pyx_v_Nz, __pyx_v_delta_x, __pyx_v_filter_width, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -2938,7 +3032,7 @@ static PyObject *__pyx_pf_28compute_DNS_grad_4thO_cython_compute_DNS_grad_4thO_c
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_AddTraceback("compute_DNS_grad_4thO_cython.compute_DNS_grad_4thO_cython", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("compute_LES_grad_4thO_tensor_cython.compute_LES_grad_4thO_tensor_cython", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __PYX_XDEC_MEMVIEW(&__pyx_v_field, 1);
@@ -18300,7 +18394,7 @@ static PyBufferProcs __pyx_tp_as_buffer_array = {
 
 static PyTypeObject __pyx_type___pyx_array = {
   PyVarObject_HEAD_INIT(0, 0)
-  "compute_DNS_grad_4thO_cython.array", /*tp_name*/
+  "compute_LES_grad_4thO_tensor_cython.array", /*tp_name*/
   sizeof(struct __pyx_array_obj), /*tp_basicsize*/
   0, /*tp_itemsize*/
   __pyx_tp_dealloc_array, /*tp_dealloc*/
@@ -18411,7 +18505,7 @@ static PyMethodDef __pyx_methods_Enum[] = {
 
 static PyTypeObject __pyx_type___pyx_MemviewEnum = {
   PyVarObject_HEAD_INIT(0, 0)
-  "compute_DNS_grad_4thO_cython.Enum", /*tp_name*/
+  "compute_LES_grad_4thO_tensor_cython.Enum", /*tp_name*/
   sizeof(struct __pyx_MemviewEnum_obj), /*tp_basicsize*/
   0, /*tp_itemsize*/
   __pyx_tp_dealloc_Enum, /*tp_dealloc*/
@@ -18664,7 +18758,7 @@ static PyBufferProcs __pyx_tp_as_buffer_memoryview = {
 
 static PyTypeObject __pyx_type___pyx_memoryview = {
   PyVarObject_HEAD_INIT(0, 0)
-  "compute_DNS_grad_4thO_cython.memoryview", /*tp_name*/
+  "compute_LES_grad_4thO_tensor_cython.memoryview", /*tp_name*/
   sizeof(struct __pyx_memoryview_obj), /*tp_basicsize*/
   0, /*tp_itemsize*/
   __pyx_tp_dealloc_memoryview, /*tp_dealloc*/
@@ -18794,7 +18888,7 @@ static struct PyGetSetDef __pyx_getsets__memoryviewslice[] = {
 
 static PyTypeObject __pyx_type___pyx_memoryviewslice = {
   PyVarObject_HEAD_INIT(0, 0)
-  "compute_DNS_grad_4thO_cython._memoryviewslice", /*tp_name*/
+  "compute_LES_grad_4thO_tensor_cython._memoryviewslice", /*tp_name*/
   sizeof(struct __pyx_memoryviewslice_obj), /*tp_basicsize*/
   0, /*tp_itemsize*/
   __pyx_tp_dealloc__memoryviewslice, /*tp_dealloc*/
@@ -18862,24 +18956,24 @@ static PyTypeObject __pyx_type___pyx_memoryviewslice = {
 };
 
 static PyMethodDef __pyx_methods[] = {
-  {"compute_DNS_grad_4thO_cython", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_28compute_DNS_grad_4thO_cython_1compute_DNS_grad_4thO_cython, METH_VARARGS|METH_KEYWORDS, 0},
+  {"compute_LES_grad_4thO_tensor_cython", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_35compute_LES_grad_4thO_tensor_cython_1compute_LES_grad_4thO_tensor_cython, METH_VARARGS|METH_KEYWORDS, 0},
   {0, 0, 0, 0}
 };
 
 #if PY_MAJOR_VERSION >= 3
 #if CYTHON_PEP489_MULTI_PHASE_INIT
 static PyObject* __pyx_pymod_create(PyObject *spec, PyModuleDef *def); /*proto*/
-static int __pyx_pymod_exec_compute_DNS_grad_4thO_cython(PyObject* module); /*proto*/
+static int __pyx_pymod_exec_compute_LES_grad_4thO_tensor_cython(PyObject* module); /*proto*/
 static PyModuleDef_Slot __pyx_moduledef_slots[] = {
   {Py_mod_create, (void*)__pyx_pymod_create},
-  {Py_mod_exec, (void*)__pyx_pymod_exec_compute_DNS_grad_4thO_cython},
+  {Py_mod_exec, (void*)__pyx_pymod_exec_compute_LES_grad_4thO_tensor_cython},
   {0, NULL}
 };
 #endif
 
 static struct PyModuleDef __pyx_moduledef = {
     PyModuleDef_HEAD_INIT,
-    "compute_DNS_grad_4thO_cython",
+    "compute_LES_grad_4thO_tensor_cython",
     0, /* m_doc */
   #if CYTHON_PEP489_MULTI_PHASE_INIT
     0, /* m_size */
@@ -18956,6 +19050,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_enumerate, __pyx_k_enumerate, sizeof(__pyx_k_enumerate), 0, 0, 1, 1},
   {&__pyx_n_s_error, __pyx_k_error, sizeof(__pyx_k_error), 0, 0, 1, 1},
   {&__pyx_n_s_field, __pyx_k_field, sizeof(__pyx_k_field), 0, 0, 1, 1},
+  {&__pyx_n_s_filter_width, __pyx_k_filter_width, sizeof(__pyx_k_filter_width), 0, 0, 1, 1},
   {&__pyx_n_s_flags, __pyx_k_flags, sizeof(__pyx_k_flags), 0, 0, 1, 1},
   {&__pyx_n_s_float32, __pyx_k_float32, sizeof(__pyx_k_float32), 0, 0, 1, 1},
   {&__pyx_n_s_format, __pyx_k_format, sizeof(__pyx_k_format), 0, 0, 1, 1},
@@ -19018,7 +19113,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {0, 0, 0, 0, 0, 0, 0}
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
-  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 37, __pyx_L1_error)
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 39, __pyx_L1_error)
   __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(1, 272, __pyx_L1_error)
   __pyx_builtin_RuntimeError = __Pyx_GetBuiltinName(__pyx_n_s_RuntimeError); if (!__pyx_builtin_RuntimeError) __PYX_ERR(1, 856, __pyx_L1_error)
   __pyx_builtin_ImportError = __Pyx_GetBuiltinName(__pyx_n_s_ImportError); if (!__pyx_builtin_ImportError) __PYX_ERR(1, 1038, __pyx_L1_error)
@@ -19381,7 +19476,6 @@ static CYTHON_SMALL_CODE int __Pyx_InitGlobals(void) {
   if (__Pyx_InitStrings(__pyx_string_tab) < 0) __PYX_ERR(0, 1, __pyx_L1_error);
   __pyx_int_0 = PyInt_FromLong(0); if (unlikely(!__pyx_int_0)) __PYX_ERR(0, 1, __pyx_L1_error)
   __pyx_int_1 = PyInt_FromLong(1); if (unlikely(!__pyx_int_1)) __PYX_ERR(0, 1, __pyx_L1_error)
-  __pyx_int_2 = PyInt_FromLong(2); if (unlikely(!__pyx_int_2)) __PYX_ERR(0, 1, __pyx_L1_error)
   __pyx_int_184977713 = PyInt_FromLong(184977713L); if (unlikely(!__pyx_int_184977713)) __PYX_ERR(0, 1, __pyx_L1_error)
   __pyx_int_neg_1 = PyInt_FromLong(-1); if (unlikely(!__pyx_int_neg_1)) __PYX_ERR(0, 1, __pyx_L1_error)
   return 0;
@@ -19558,11 +19652,11 @@ static int __Pyx_modinit_function_import_code(void) {
 
 
 #if PY_MAJOR_VERSION < 3
-__Pyx_PyMODINIT_FUNC initcompute_DNS_grad_4thO_cython(void) CYTHON_SMALL_CODE; /*proto*/
-__Pyx_PyMODINIT_FUNC initcompute_DNS_grad_4thO_cython(void)
+__Pyx_PyMODINIT_FUNC initcompute_LES_grad_4thO_tensor_cython(void) CYTHON_SMALL_CODE; /*proto*/
+__Pyx_PyMODINIT_FUNC initcompute_LES_grad_4thO_tensor_cython(void)
 #else
-__Pyx_PyMODINIT_FUNC PyInit_compute_DNS_grad_4thO_cython(void) CYTHON_SMALL_CODE; /*proto*/
-__Pyx_PyMODINIT_FUNC PyInit_compute_DNS_grad_4thO_cython(void)
+__Pyx_PyMODINIT_FUNC PyInit_compute_LES_grad_4thO_tensor_cython(void) CYTHON_SMALL_CODE; /*proto*/
+__Pyx_PyMODINIT_FUNC PyInit_compute_LES_grad_4thO_tensor_cython(void)
 #if CYTHON_PEP489_MULTI_PHASE_INIT
 {
   return PyModuleDef_Init(&__pyx_moduledef);
@@ -19629,7 +19723,7 @@ bad:
 }
 
 
-static CYTHON_SMALL_CODE int __pyx_pymod_exec_compute_DNS_grad_4thO_cython(PyObject *__pyx_pyinit_module)
+static CYTHON_SMALL_CODE int __pyx_pymod_exec_compute_LES_grad_4thO_tensor_cython(PyObject *__pyx_pyinit_module)
 #endif
 #endif
 {
@@ -19640,7 +19734,7 @@ static CYTHON_SMALL_CODE int __pyx_pymod_exec_compute_DNS_grad_4thO_cython(PyObj
   #if CYTHON_PEP489_MULTI_PHASE_INIT
   if (__pyx_m) {
     if (__pyx_m == __pyx_pyinit_module) return 0;
-    PyErr_SetString(PyExc_RuntimeError, "Module 'compute_DNS_grad_4thO_cython' has already been imported. Re-initialisation is not supported.");
+    PyErr_SetString(PyExc_RuntimeError, "Module 'compute_LES_grad_4thO_tensor_cython' has already been imported. Re-initialisation is not supported.");
     return -1;
   }
   #elif PY_MAJOR_VERSION >= 3
@@ -19655,7 +19749,7 @@ if (!__Pyx_RefNanny) {
       Py_FatalError("failed to import 'refnanny' module");
 }
 #endif
-  __Pyx_RefNannySetupContext("__Pyx_PyMODINIT_FUNC PyInit_compute_DNS_grad_4thO_cython(void)", 0);
+  __Pyx_RefNannySetupContext("__Pyx_PyMODINIT_FUNC PyInit_compute_LES_grad_4thO_tensor_cython(void)", 0);
   if (__Pyx_check_binary_version() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #ifdef __Pxy_PyFrame_Initialize_Offsets
   __Pxy_PyFrame_Initialize_Offsets();
@@ -19694,7 +19788,7 @@ if (!__Pyx_RefNanny) {
   Py_INCREF(__pyx_m);
   #else
   #if PY_MAJOR_VERSION < 3
-  __pyx_m = Py_InitModule4("compute_DNS_grad_4thO_cython", __pyx_methods, 0, 0, PYTHON_API_VERSION); Py_XINCREF(__pyx_m);
+  __pyx_m = Py_InitModule4("compute_LES_grad_4thO_tensor_cython", __pyx_methods, 0, 0, PYTHON_API_VERSION); Py_XINCREF(__pyx_m);
   #else
   __pyx_m = PyModule_Create(&__pyx_moduledef);
   #endif
@@ -19712,14 +19806,14 @@ if (!__Pyx_RefNanny) {
   #if PY_MAJOR_VERSION < 3 && (__PYX_DEFAULT_STRING_ENCODING_IS_ASCII || __PYX_DEFAULT_STRING_ENCODING_IS_DEFAULT)
   if (__Pyx_init_sys_getdefaultencoding_params() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
-  if (__pyx_module_is_main_compute_DNS_grad_4thO_cython) {
+  if (__pyx_module_is_main_compute_LES_grad_4thO_tensor_cython) {
     if (PyObject_SetAttr(__pyx_m, __pyx_n_s_name_2, __pyx_n_s_main) < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   }
   #if PY_MAJOR_VERSION >= 3
   {
     PyObject *modules = PyImport_GetModuleDict(); if (unlikely(!modules)) __PYX_ERR(0, 1, __pyx_L1_error)
-    if (!PyDict_GetItemString(modules, "compute_DNS_grad_4thO_cython")) {
-      if (unlikely(PyDict_SetItemString(modules, "compute_DNS_grad_4thO_cython", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
+    if (!PyDict_GetItemString(modules, "compute_LES_grad_4thO_tensor_cython")) {
+      if (unlikely(PyDict_SetItemString(modules, "compute_LES_grad_4thO_tensor_cython", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
     }
   }
   #endif
@@ -19740,7 +19834,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_patch_abc() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
 
-  /* "compute_DNS_grad_4thO_cython.pyx":6
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":6
  * 
  * #import cython
  * import numpy as np             # <<<<<<<<<<<<<<
@@ -19752,7 +19846,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) __PYX_ERR(0, 6, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "compute_DNS_grad_4thO_cython.pyx":15
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":15
  * # USE SINGLE PRECISSION (np.float32 and float in C) FOR SPEED UP
  * #################
  * DTYPE = np.float32             # <<<<<<<<<<<<<<
@@ -19767,7 +19861,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_DTYPE, __pyx_t_2) < 0) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "compute_DNS_grad_4thO_cython.pyx":1
+  /* "compute_LES_grad_4thO_tensor_cython.pyx":1
  * # CYTHON Version to compute velocity gradients             # <<<<<<<<<<<<<<
  * 
  * #use: cythonize -a -i compute_DNS_grad_4thO_cython.pyx
@@ -19938,11 +20032,11 @@ if (!__Pyx_RefNanny) {
   __Pyx_XDECREF(__pyx_t_2);
   if (__pyx_m) {
     if (__pyx_d) {
-      __Pyx_AddTraceback("init compute_DNS_grad_4thO_cython", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      __Pyx_AddTraceback("init compute_LES_grad_4thO_tensor_cython", __pyx_clineno, __pyx_lineno, __pyx_filename);
     }
     Py_CLEAR(__pyx_m);
   } else if (!PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ImportError, "init compute_DNS_grad_4thO_cython");
+    PyErr_SetString(PyExc_ImportError, "init compute_LES_grad_4thO_tensor_cython");
   }
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();
