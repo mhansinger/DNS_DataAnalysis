@@ -1452,7 +1452,7 @@ class dns_analysis_dirac_xi(dns_analysis_dirac):
         self.grad_xi_DNS = None     # xi-Field gradients on DNS mesh
         self.dirac_times_grad_xi = None
 
-        print('You are using the Dirac version...')
+        #print('You are using the Dirac version...')
 
     def convert_c_field_to_xi(self):
         '''
@@ -2885,7 +2885,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
         # free memory and delete U fields
         del self.U, self.W, self.V, U_prime, V_prime, W_prime
 
-        ###########################
+        # ###########################
         # compute the magnitude of gradients of the velocity field on the LES mesh
         #self.compute_gradU_LES_4thO()
         # use imported cython function: dtype needs to be float32!
@@ -2986,12 +2986,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
         # #creat dask array and reshape all data
 
         self.dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
-                                        grad_c_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_c_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_c_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_c_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_c_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_c_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+
                                           self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
                                           self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
                                           Xi_iso_085.reshape(self.Nx * self.Ny * self.Nz,1),
@@ -3001,36 +2996,81 @@ class dns_analysis_tensors(dns_analysis_UVW):
                                           self.U_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
                                           self.V_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
                                           self.W_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_U_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_V_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_W_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_U_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_V_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_W_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_U_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_V_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_W_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_U_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_V_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_W_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_U_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_V_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_W_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_U_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_V_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
-                                        grad_W_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+
                                   ])
 
+        self.dataArray_LES_grads_da = da.hstack([
+                                        #self.c_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_c_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_c_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_c_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_c_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_c_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_c_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+
+                                       grad_U_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_V_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_W_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_U_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_V_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_W_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_U_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_V_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_W_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_U_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_V_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_W_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_U_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_V_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_W_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_U_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_V_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_W_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       ])
+
+        self.dataArray_DNS_grads_da = da.hstack([
+
+                                       # grad_c_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_c_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_c_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_c_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_c_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_c_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+
+                                       # grad_U_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_V_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_W_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_U_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_V_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_W_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_U_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_V_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       # grad_W_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_U_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_V_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_W_x_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_U_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_V_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_W_y_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_U_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_V_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       grad_W_z_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                       ])
+
         filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_tensor.pkl')
+        filename_LES = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(
+            self.filter_width) + '_grad_LES_tensor.pkl')
+        filename_DNS = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(
+            self.filter_width) + '_grad_DNS_tensor.pkl')
 
         dataArray_dd = dd.io.from_dask_array(self.dataArray_da,columns=
                                                   ['c_bar',
-                                                   'grad_c_x_LES',
-                                                   'grad_c_y_LES',
-                                                   'grad_c_z_LES',
-                                                   'grad_c_x_DNS',
-                                                   'grad_c_y_DNS',
-                                                   'grad_c_z_DNS',
+                                                   # 'grad_c_x_LES',
+                                                   # 'grad_c_y_LES',
+                                                   # 'grad_c_z_LES',
+                                                   # 'grad_c_x_DNS',
+                                                   # 'grad_c_y_DNS',
+                                                   # 'grad_c_z_DNS',
                                                    'omega_DNS_filtered',
                                                    'omega_model_planar',
                                                    'Xi_iso_085',
@@ -3040,6 +3080,44 @@ class dns_analysis_tensors(dns_analysis_UVW):
                                                    'U_prime',
                                                    'V_prime',
                                                    'W_prime',
+                                                   # 'grad_U_x_LES',
+                                                   # 'grad_V_x_LES',
+                                                   # 'grad_W_x_LES',
+                                                   # 'grad_U_y_LES',
+                                                   # 'grad_V_y_LES',
+                                                   # 'grad_W_y_LES',
+                                                   # 'grad_U_z_LES',
+                                                   # 'grad_V_z_LES',
+                                                   # 'grad_W_z_LES',
+                                                   # 'grad_U_x_DNS',
+                                                   # 'grad_V_x_DNS',
+                                                   # 'grad_W_x_DNS',
+                                                   # 'grad_U_y_DNS',
+                                                   # 'grad_V_y_DNS',
+                                                   # 'grad_W_y_DNS',
+                                                   # 'grad_U_z_DNS',
+                                                   # 'grad_V_z_DNS',
+                                                   # 'grad_W_z_DNS',
+                                                   ])
+
+
+        dataArray_LES_dd = dd.io.from_dask_array(self.dataArray_LES_grads_da,columns=
+                                                  [#'c_bar',
+                                                   'grad_c_x_LES',
+                                                   'grad_c_y_LES',
+                                                   'grad_c_z_LES',
+                                                   # 'grad_c_x_DNS',
+                                                   # 'grad_c_y_DNS',
+                                                   # 'grad_c_z_DNS',
+                                                   # 'omega_DNS_filtered',
+                                                   # 'omega_model_planar',
+                                                   # 'Xi_iso_085',
+                                                   # 'U_bar',
+                                                   # 'V_bar',
+                                                   # 'W_bar',
+                                                   # 'U_prime',
+                                                   # 'V_prime',
+                                                   # 'W_prime',
                                                    'grad_U_x_LES',
                                                    'grad_V_x_LES',
                                                    'grad_W_x_LES',
@@ -3049,6 +3127,43 @@ class dns_analysis_tensors(dns_analysis_UVW):
                                                    'grad_U_z_LES',
                                                    'grad_V_z_LES',
                                                    'grad_W_z_LES',
+                                                   # 'grad_U_x_DNS',
+                                                   # 'grad_V_x_DNS',
+                                                   # 'grad_W_x_DNS',
+                                                   # 'grad_U_y_DNS',
+                                                   # 'grad_V_y_DNS',
+                                                   # 'grad_W_y_DNS',
+                                                   # 'grad_U_z_DNS',
+                                                   # 'grad_V_z_DNS',
+                                                   # 'grad_W_z_DNS',
+                                                   ])
+
+        dataArray_DNS_dd = dd.io.from_dask_array(self.dataArray_DNS_grads_da,columns=
+                                                  [#'c_bar',
+                                                   # 'grad_c_x_LES',
+                                                   # 'grad_c_y_LES',
+                                                   # 'grad_c_z_LES',
+                                                   'grad_c_x_DNS',
+                                                   'grad_c_y_DNS',
+                                                   'grad_c_z_DNS',
+                                                   # 'omega_DNS_filtered',
+                                                   # 'omega_model_planar',
+                                                   # 'Xi_iso_085',
+                                                   # 'U_bar',
+                                                   # 'V_bar',
+                                                   # 'W_bar',
+                                                   # 'U_prime',
+                                                   # 'V_prime',
+                                                   # 'W_prime',
+                                                   # 'grad_U_x_LES',
+                                                   # 'grad_V_x_LES',
+                                                   # 'grad_W_x_LES',
+                                                   # 'grad_U_y_LES',
+                                                   # 'grad_V_y_LES',
+                                                   # 'grad_W_y_LES',
+                                                   # 'grad_U_z_LES',
+                                                   # 'grad_V_z_LES',
+                                                   # 'grad_W_z_LES',
                                                    'grad_U_x_DNS',
                                                    'grad_V_x_DNS',
                                                    'grad_W_x_DNS',
@@ -3068,9 +3183,16 @@ class dns_analysis_tensors(dns_analysis_UVW):
 
         print('Computing data array ...')
         dataArray_df = dataArray_dd.compute()
+        dataArray_LES_df = dataArray_LES_dd.compute()
+        dataArray_DNS_df = dataArray_DNS_dd.compute()
 
         print('Writing output to pickle ...')
         dataArray_df.to_pickle(filename)
+        print('Writing LES grads to pickle ...')
+        dataArray_LES_df.to_pickle(filename_LES)
+        print('Writing DNS grads to pickle ...')
+        dataArray_DNS_df.to_pickle(filename_DNS)
+
         print('Data has been written.\n\n')
 
 
