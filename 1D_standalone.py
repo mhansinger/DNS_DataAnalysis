@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy.interpolate import splrep, splev
 
+import tikzplotlib
+
 # latex rendering
 # plt.rc('text', usetex=True)
 # plt.rc('font', family='serif')
@@ -165,8 +167,8 @@ fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
 
 ax2 = ax1.twinx()
 
-UPPER=3
-LOWER=-5
+UPPER=1#3
+LOWER=-1#-5
 
 nr_bins = 70
 
@@ -184,7 +186,8 @@ ax1.legend(loc='best', bbox_to_anchor=(0, 0, 0.75, 0.75))
 ax2.legend(loc='best', bbox_to_anchor=(0, 0, 0.95, 0.95))
 plt.xlabel('xi')
 plt.xlim([-6,3.5])
-plt.savefig('plots/c_all2_%f_%f.png' % (LOWER,UPPER),format='png')
+tikzplotlib.save('plots/c_all2_%i_%i.tex' % (int(LOWER),int(UPPER)))
+#plt.savefig('plots/c_all2_%f_%f.png' % (LOWER,UPPER),format='png')
 plt.show(block=False)
 
 # position of filters
@@ -203,9 +206,10 @@ c_mean=c_plot.mean()
 plt.title('$p(c)$')
 plt.ylabel('Frequency')
 plt.xlabel('$c$')
-plt.text(0.12, 14, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
-plt.text(0.12, 11, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
-plt.savefig('plots/histogram_all_c_%f_%f.png' % (LOWER,UPPER),format='png')
+plt.text(0.12, 3.5, '$\overline{c}=%.3f$' % c_mean,fontsize=20)
+plt.text(0.12, 2.8, '$\overline{\dot{\omega}}=%.3f$' % omega_mean,fontsize=20)
+tikzplotlib.save('plots/histogram_all_c_%i_%i.tex' % (int(LOWER),int(UPPER)))
+#plt.savefig('plots/histogram_all_c_%f_%f.png' % (LOWER,UPPER),format='png')
 plt.show()
 
 

@@ -181,11 +181,17 @@ class dns_analysis_base(object):
         :return: nothing
         '''
 
-        print('Reading in c-field data...')
+        print('Reading in c, rho*c, rho data...')
 
         try:
             c_data_vec = pd.read_csv(self.c_path,names=['c']).values.astype(dtype=np.float32)
             self.c_data_np = c_data_vec.reshape(self.Nx,self.Ny,self.Nz)
+
+            crho_data_vec = pd.read_csv(self.c_by_rho_path,names=['rho_c']).values.astype(dtype=np.float32)
+            self.rho_c_data_np = crho_data_vec.reshape(self.Nx,self.Ny,self.Nz)
+
+            rho_data_vec = pd.read_csv(self.rho_path,names = ['rho']).values.astype(dtype=np.float32)
+            self.rho_data_np = rho_data_vec.reshape(self.Nx,self.Ny,self.Nz)
 
         except OSError:
             print('c.dat not found, compute it from rho_c.dat and rho.dat')
@@ -2475,7 +2481,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         :return: nothing
         '''
 
-        print('Reading in data the velocity data ...')
+        print('Reading the velocity data ...')
 
         U_np = pd.read_csv(join(self.case, 'U.dat'), names=['U']).values.astype(dtype=np.float32)
         V_np = pd.read_csv(join(self.case, 'V.dat'), names=['U']).values.astype(dtype=np.float32)
@@ -2825,9 +2831,55 @@ class dns_analysis_tensors(dns_analysis_UVW):
         # extend super class with additional input parameters
         super(dns_analysis_tensors, self).__init__(case, eps_factor,c_iso_values)
 
+        self.rho_c_filtered = None
+        self.rho_filtered = None
+        self.c_tilde = None
+        self.SGS_scalar_flux = None
+        self.UP_delta = None
+
         print('This is the version that computes gradient tensors on DNS and LES grid ...')
 
     # constructor end
+
+    def compute_sgs_flux(self):
+        '''
+        Computes the SGS scalar flux: research_progress_shin_8.pdf: slide 6
+        :return:
+        '''
+        print('computing SGS scalar flux ...')
+        # compute the components of u*c
+        U_c_bar = self.apply_filter(self.c_data_np * self.U)
+        V_c_bar = self.apply_filter(self.c_data_np * self.V)
+        W_c_bar = self.apply_filter(self.c_data_np * self.W)
+
+        TAU_11 = U_c_bar - self.c_filtered * self.U_bar
+        TAU_22 = V_c_bar - self.c_filtered * self.V_bar
+        TAU_33 = W_c_bar - self.c_filtered * self.W_bar
+
+        self.SGS_scalar_flux = np.sqrt(TAU_11 **2 + TAU_22 ** 2 + TAU_33**2)
+
+    def compute_UP_delta(self):
+        '''
+        #compute U_prime sgs according to Junsu, slide 6, research_progress_shin_8.pptx
+        :return:
+        '''
+
+        print('computing UP_delta ...')
+
+        U_rho_bar = self.apply_filter(self.U*self.rho_data_np)
+        V_rho_bar = self.apply_filter(self.V*self.rho_data_np)
+        W_rho_bar = self.apply_filter(self.W*self.rho_data_np)
+
+        UU_rho_bar = self.apply_filter(self.U*self.U*self.rho_data_np)
+        VV_rho_bar = self.apply_filter(self.V*self.V*self.rho_data_np)
+        WW_rho_bar = self.apply_filter(self.W*self.W*self.rho_data_np)
+
+        TAU11 = UU_rho_bar - (U_rho_bar**2 / self.rho_filtered)
+        TAU22 = VV_rho_bar - (V_rho_bar**2 / self.rho_filtered)
+        TAU33 = WW_rho_bar - (W_rho_bar**2 / self.rho_filtered)
+
+        self.UP_delta = np.sqrt((TAU11+TAU22+TAU33)/(3.0*self.rho_filtered) )
+
 
 
     def run_analysis_tensors(self,filter_width ,filter_type, c_analytical=False):
@@ -2857,15 +2909,21 @@ class dns_analysis_tensors(dns_analysis_UVW):
         self.read_UVW()
 
         # filter the c and rho field
-        print('Filtering c field ')
+        print('Filtering c, rho*c, rho fields ')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
         self.c_filtered = self.apply_filter(self.c_data_np)
+        self.rho_c_filtered = self.apply_filter(self.rho_c_data_np)
+        self.rho_filtered = self.apply_filter(self.rho_data_np)
+
+        print('computing c_tilde')
+        self.c_tilde = self.rho_c_filtered/ self.rho_filtered
 
         #Todo: In paralllel? How?
         print('Filtering U components')
         self.U_bar = self.apply_filter(self.U)
         self.V_bar = self.apply_filter(self.V)
         self.W_bar = self.apply_filter(self.W)
+
 
         ###########################
         print('Computing U primes')
@@ -3195,6 +3253,176 @@ class dns_analysis_tensors(dns_analysis_UVW):
 
         print('Data has been written.\n\n')
 
+
+    # for junsu: 18.5.20
+    def run_analysis_tilde(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        ##Todo: muss noch überarbeitet werden!
+
+        self.every_nth = 1
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        #('Reading in U fieds ...')
+        self.read_UVW()
+
+        # filter the c and rho field
+        print('Filtering c, rho*c, rho fields ')
+        #self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.rho_c_filtered = self.apply_filter(self.rho_c_data_np)
+        self.rho_filtered = self.apply_filter(self.rho_data_np)
+
+        print('computing c_tilde')
+        self.c_tilde = self.rho_c_filtered/ self.rho_filtered
+
+        #Todo: In paralllel? How?
+        print('Filtering U components')
+        self.U_bar = self.apply_filter(self.U)
+        self.V_bar = self.apply_filter(self.V)
+        self.W_bar = self.apply_filter(self.W)
+
+
+        # Computing SGS scalar flux
+        self.compute_sgs_flux()
+
+        # Computing UP_delta
+        self.compute_UP_delta()
+
+
+        ###########################
+        # U PRIMES
+        #check if U_prime has already been computed!
+        Uprime_filename = 'filter_width_TOPHAT_%i_tensor.pkl' % self.filter_width
+
+        file_list = os.listdir(join(self.case,'postProcess_UVW'))
+
+        if Uprime_filename in file_list: #os.path.isdir(Uprime_filename):
+            print('Using U_primes form: ',Uprime_filename)
+
+            data_df = pd.read_pickle(join(self.case,'postProcess_UVW',Uprime_filename))
+
+            self.U_prime = data_df['U_prime'].values.reshape(512, 512, 512)
+            self.V_prime = data_df['V_prime'].values.reshape(512, 512, 512)
+            self.W_prime = data_df['W_prime'].values.reshape(512, 512, 512)
+
+            del data_df
+
+        else:
+            print('Computing U primes')
+            # imported cython function: dtype needs to be float32!
+            U_prime, V_prime, W_prime = compute_U_prime_cython(np.ascontiguousarray(self.U, dtype=np.float32),
+                                                                np.ascontiguousarray(self.V, dtype=np.float32),
+                                                                np.ascontiguousarray(self.W, dtype=np.float32),
+                                                                self.Nx, self.Ny, self.Nz, self.filter_width)
+
+            #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+            self.U_prime = np.asarray(U_prime)
+            self.V_prime = np.asarray(V_prime)
+            self.W_prime = np.asarray(W_prime)
+
+            # free memory and delete U fields
+            del self.U, self.W, self.V, U_prime, V_prime, W_prime
+
+
+        ###########################
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+
+        ###########################
+        # compute abs(grad(xi)) on the whole DNS domain
+        self.convert_c_field_to_xi()
+        # self.grad_xi_DNS = self.compute_DNS_grad_xi_4thO()
+        # CYTHON
+        print('Computing gradients of xi on DNS mesh 4th Order with Cython')
+        grad_xi_DNS = compute_DNS_grad_4thO_cython(np.ascontiguousarray(self.xi_np, dtype=np.float32),
+                                                      self.Nx, self.Ny, self.Nz, np.float32(self.delta_x))
+
+        self.grad_xi_DNS = np.asarray(grad_xi_DNS)
+
+        del grad_xi_DNS     # free memory
+
+
+        ###########################
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        # 2nd method to compute Xi
+        Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
+
+        # #creat dask array and reshape all data
+
+        self.dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
+                                          self.c_tilde.reshape(self.Nx * self.Ny * self.Nz,1),
+                                          self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          Xi_iso_085.reshape(self.Nx * self.Ny * self.Nz,1),
+                                          self.U_bar.reshape(self.Nx * self.Ny * self.Nz,1),
+                                          self.V_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.W_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.U_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.V_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.W_prime.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.SGS_scalar_flux.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                          self.UP_delta.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                    ])
+
+        filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_tilde.pkl')
+
+        dataArray_dd = dd.io.from_dask_array(self.dataArray_da,columns=
+                                                  ['c_bar',
+                                                    'c_tilde',
+                                                   'omega_DNS_filtered',
+                                                   'omega_model_planar',
+                                                   'Xi_iso_085',
+                                                   'U_bar',
+                                                   'V_bar',
+                                                   'W_bar',
+                                                   'U_prime',
+                                                   'V_prime',
+                                                   'W_prime',
+                                                   'scalar_flux_SGS',
+                                                   'UP_delta',
+                                                   ])
+
+
+        # # filter the data set and remove unecessary entries
+        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
+        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.999]
+        #
+        # dataArray_dd = dataArray_dd[dataArray_dd['grad_U'] != 0.0]
+
+        print('Computing data array ...')
+        dataArray_df = dataArray_dd.compute()
+
+
+        print('Writing output to pickle ...')
+        dataArray_df.to_pickle(filename)
+
+
+        print('Data has been written.\n\n')
 
     def run_analysis_UVW(self,filter_width ,filter_type, c_analytical=False):
         return NotImplementedError
