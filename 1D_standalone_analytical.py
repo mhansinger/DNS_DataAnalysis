@@ -2,6 +2,8 @@
 This is to plot the Histograms from 1D profiles
 '''
 
+# %%
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -153,14 +155,14 @@ def model_omega_bar(c_plus,c_minus,Delta_LES,m):
     return (c_plus**(m+1) - c_minus**(m+1))/Delta_LES
 
 
-def compute_Delta_DNS(xi):
+def compute_Delta_DNS(xi,m):
     '''
     Computes the Delta DNS in xi Coordinates
     :param xi:
     :return:
     '''
 
-    flame_thickness = compute_flamethickness()
+    flame_thickness = compute_flamethickness(m)
 
     xi_range = abs(xi[0]) + abs(xi[-1])
     stencil_width = xi_range/len(xi)
@@ -237,58 +239,58 @@ tikzplotlib.save('plots/histogram_all_c_%i_%i.tex' % (int(LOWER),int(UPPER)))
 plt.show()
 
 
-#
-# # compute Delta_DNS
-# Delta_DNS = compute_Delta_DNS(xi)
-#
-# Filter_width = [1,5,10,16,24,32,48,96,120,200]
-#
-# plt.figure()
-#
-# # loop over the different Filters
-# for Filter in Filter_width:
-#
-#     omega_analytic_list = []
-#     omega_model_list = []
-#     c_bar_list = []
-#
-#     Delta_LES = Delta_DNS * Filter
-#
-#     for i in range(0,len(c_verlauf) - Filter):
-#
-#         this_c_bar = c_verlauf[i:i + Filter].mean()
-#         this_analytical_omega_bar = omega_verlauf[i:i + Filter].mean()
-#
-#         # compute the boundaries:
-#         this_c_minus = compute_c_minus(c = this_c_bar,Delta_LES=Delta_LES)
-#         this_c_plus = compute_c_plus(c_minus=this_c_minus,Delta_LES=Delta_LES)
-#
-#         this_model_omega_bar = model_omega_bar(this_c_plus,this_c_minus, Delta_LES=Delta_LES ,m)
-#
-#         # print(' ')
-#         # print('c_bar: %.2f  c_minus: %.2f  c_plus: %.2f  analytical_omega: %.2f  model_omega: %.2f' %
-#         #       (this_c_bar, this_c_minus, this_c_plus, this_analytical_omega_bar, this_model_omega_bar))
-#
-#         omega_analytic_list.append(this_analytical_omega_bar)
-#         omega_model_list.append(this_model_omega_bar)
-#         c_bar_list.append(this_c_bar)
-#
-#     # plt.plot(xi[:-Filter],omega_analytic_list)
-#     # plt.title('omega_numerical')
-#     # plt.xlabel('xi')
-#     # plt.savefig('plots/Omega_numerical_xi.png')
-#
-#     # plt.figure()
-#     plt.title(r"Delta {LES}=%.3f~Delta {DNS}=%.3f~Filter=%i" % (Delta_LES,Delta_DNS,Filter))
-#     plt.plot(c_bar_list,omega_analytic_list,'k')
-#     plt.plot(c_bar_list,omega_model_list,'r')
-#     plt.xlabel(r"\overline{c}")
-#     plt.ylabel(r"\overline{\dot{\omega}}")
-#     plt.legend([r"\overline{\dot{\omega}}_{DNS}",r"\overline{\dot{\omega}}_{model}"])
-#     plt.savefig('plots/Vergleich_Delta_LES_%.3f.png' % Delta_LES)
-#
-#     #plt.figure()
-#     plt.show(block=False)
+# %%
+# compute Delta_DNS
+Delta_DNS = compute_Delta_DNS(xi,m)
+
+Filter_width = [1,5,10,16,24,32,48,96,120,200]
+
+plt.figure()
+
+# loop over the different Filters
+for Filter in Filter_width:
+
+    omega_analytic_list = []
+    omega_model_list = []
+    c_bar_list = []
+
+    Delta_LES = Delta_DNS * Filter
+
+    for i in range(0,len(c_verlauf) - Filter):
+
+        this_c_bar = c_verlauf[i:i + Filter].mean()
+        this_analytical_omega_bar = omega_verlauf[i:i + Filter].mean()
+
+        # compute the boundaries:
+        this_c_minus = compute_c_minus(c = this_c_bar,Delta_LES=Delta_LES,m=m)
+        this_c_plus = compute_c_plus(c_minus=this_c_minus,Delta_LES=Delta_LES,m=m)
+
+        this_model_omega_bar = model_omega_bar(this_c_plus,this_c_minus, Delta_LES=Delta_LES,m=m)
+
+        # print(' ')
+        # print('c_bar: %.2f  c_minus: %.2f  c_plus: %.2f  analytical_omega: %.2f  model_omega: %.2f' %
+        #       (this_c_bar, this_c_minus, this_c_plus, this_analytical_omega_bar, this_model_omega_bar))
+
+        omega_analytic_list.append(this_analytical_omega_bar)
+        omega_model_list.append(this_model_omega_bar)
+        c_bar_list.append(this_c_bar)
+
+    # plt.plot(xi[:-Filter],omega_analytic_list)
+    # plt.title('omega_numerical')
+    # plt.xlabel('xi')
+    # plt.savefig('plots/Omega_numerical_xi.png')
+
+    # plt.figure()
+    plt.title(r"Delta {LES}=%.3f~Delta {DNS}=%.3f~Filter=%i" % (Delta_LES,Delta_DNS,Filter))
+    plt.plot(c_bar_list,omega_analytic_list,'k')
+    plt.plot(c_bar_list,omega_model_list,'r')
+    plt.xlabel(r"\overline{c}")
+    plt.ylabel(r"\overline{\dot{\omega}}")
+    plt.legend([r"\overline{\dot{\omega}}_{DNS}",r"\overline{\dot{\omega}}_{model}"])
+    #plt.savefig('plots/Vergleich_Delta_LES_%.3f.png' % Delta_LES)
+
+    #plt.figure()
+    plt.show(block=False)
 
 
 
