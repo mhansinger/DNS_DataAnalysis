@@ -10,15 +10,12 @@ from scipy.interpolate import splrep, splev
 
 import tikzplotlib
 
-# latex rendering
-# plt.rc('text', usetex=True)
-# plt.rc('font', family='serif')
 
 m = 4.4545
 beta = 6
 alpha = 9/11
 
-raw = np.loadtxt('c_Verlauf_Pfitzner.txt')#np.linspace(0.0001,0.9999,100)
+raw = np.loadtxt('c_Verlauf_Pfitzner.txt')
 
 xi_org = raw[:,0]
 c_org = raw[:,1]
@@ -30,22 +27,28 @@ xi = np.linspace(min(xi_org), max(xi_org), num=5000, endpoint=True)
 c_verlauf = interp_func(xi)
 
 # %%
-# try:
-#     c_verlauf = np.loadtxt('C_verlauf.txt')
-# except:
-#     c_path = input('Give the path to C_verlauf.txt')
-#     c_verlauf = np.loadtxt(c_path)
+
+'''
+Equations according to: 
+Pfitzner, M. A New Analytic pdf for Simulations of Premixed Turbulent Combustion. Flow Turbulence Combust (2020). https://doi.org/10.1007/s10494-020-00137-x
+'''
 
 # check function for delta_0:
 def compute_delta0(c):
+    '''
+    Eq. 59
+    :param c:
+    :return:
+    '''
 
     return (1 - c ** m) / (1 - c)
 
-def compute_s(c,Delta_LES):
+def compute_s(c,Delta_LES,m):
     '''
-    Eq. 39
+    Eq. 60
     :param c:
     :param Delta_LES:
+    :param m:
     :return:
     '''
     s = np.exp(-Delta_LES/7)*((np.exp(Delta_LES/7) - 1) * np.exp(2 * (c-1) * m) + c)
@@ -53,19 +56,35 @@ def compute_s(c,Delta_LES):
 
 
 # compute the values for c_minus
-def compute_c_minus(c,Delta_LES):
-    # Eq. 40
-    this_s = compute_s(c,Delta_LES)
+def compute_c_minus(c,Delta_LES,m):
+    '''
+    Eq. 61
+    :param c:
+    :param Delta_LES:
+    :param m:
+    :return:
+    '''
+    this_s = compute_s(c,Delta_LES,m)
     this_delta_0 = compute_delta0(this_s)
 
     c_min = (np.exp(c * this_delta_0 * Delta_LES) -1) / (np.exp(this_delta_0*Delta_LES) - 1)
     return c_min
 
 
-def compute_c_m(xi):
+def compute_c_m(xi,m):
+    '''
+    Eq. 12
+    :param xi:
+    :return:
+    '''
     return (1+ np.exp(-m*xi))**(-1/m)
 
 def compute_xi_m(c):
+    '''
+    Eq. 13
+    :param c:
+    :return:
+    '''
     return 1/m * np.log(c**m /(1-c**m))
 
 def analytical_omega(alpha,beta,c):
@@ -84,33 +103,36 @@ def analytical_omega(alpha,beta,c):
     return Eigenval*((1-alpha*(1-c)))**(-1)*(1-c)*np.exp(exponent)
 
 
-def compute_c_plus(c_minus,Delta_LES):
+def compute_c_plus(c_minus,Delta_LES,m):
     '''
-    :param c: c_minus
+    See Section 13 (no equation)
+    :param c_minus:
+    :param Delta_LES:
+    :param m:
     :return:
-    Eq. 13
     '''
     this_xi_m = compute_xi_m(c_minus)
 
     xi_plus_Delta = this_xi_m+Delta_LES
-    this_c_plus = compute_c_m(xi_plus_Delta)
+    this_c_plus = compute_c_m(xi_plus_Delta,m)
 
     return this_c_plus
 
 
-def model_omega(c):
+def model_omega(c,m):
     '''
-    Eq. 14
+    Eq. 15
     :param c:
+    :param m:
     :return:
     '''
 
     return (m+1)*(1-c**m)*c**(m+1)
 
 
-def compute_flamethickness():
+def compute_flamethickness(m):
     '''
-    Eq. 17
+    Eq. 14
     :param m:
     :return:
     '''
@@ -118,12 +140,14 @@ def compute_flamethickness():
     return (m + 1) ** (1 / m + 1) / m
 
 
-def model_omega_bar(c_plus,c_minus,Delta_LES):
+def model_omega_bar(c_plus,c_minus,Delta_LES,m):
     '''
+    Eq. 43
     :param c_plus:
     :param c_minus:
-    :param Delta:
-    :return: omega Eq. 29
+    :param Delta_LES:
+    :param m:
+    :return:
     '''
 
     return (c_plus**(m+1) - c_minus**(m+1))/Delta_LES
@@ -160,7 +184,7 @@ plt.close('all')
 # %%
 
 omega_verlauf = analytical_omega(alpha = alpha, beta = 6, c = c_verlauf)
-omega_model = model_omega(c_verlauf)
+omega_model = model_omega(c_verlauf,m)
 
 plt.figure()
 fig, ax1 = plt.subplots(ncols=1, figsize=(6, 4))
@@ -239,7 +263,7 @@ plt.show()
 #         this_c_minus = compute_c_minus(c = this_c_bar,Delta_LES=Delta_LES)
 #         this_c_plus = compute_c_plus(c_minus=this_c_minus,Delta_LES=Delta_LES)
 #
-#         this_model_omega_bar = model_omega_bar(this_c_plus,this_c_minus, Delta_LES=Delta_LES )
+#         this_model_omega_bar = model_omega_bar(this_c_plus,this_c_minus, Delta_LES=Delta_LES ,m)
 #
 #         # print(' ')
 #         # print('c_bar: %.2f  c_minus: %.2f  c_plus: %.2f  analytical_omega: %.2f  model_omega: %.2f' %
