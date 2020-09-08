@@ -28,6 +28,7 @@ interp_func = interp1d(xi_org,c_org, kind='cubic')
 xi = np.linspace(min(xi_org), max(xi_org), num=5000, endpoint=True)
 c_verlauf = interp_func(xi)
 
+
 # %%
 
 '''
@@ -39,7 +40,7 @@ Pfitzner, M. A New Analytic pdf for Simulations of Premixed Turbulent Combustion
 def compute_delta0(c):
     '''
     Eq. 59
-    :param c:
+    :param c: LES filtered c value
     :return:
     '''
 
@@ -48,7 +49,7 @@ def compute_delta0(c):
 def compute_s(c,Delta_LES,m):
     '''
     Eq. 60
-    :param c:
+    :param c: LES filtered c value
     :param Delta_LES:
     :param m:
     :return:
@@ -61,7 +62,7 @@ def compute_s(c,Delta_LES,m):
 def compute_c_minus(c,Delta_LES,m):
     '''
     Eq. 61
-    :param c:
+    :param c: LES filtered c value
     :param Delta_LES:
     :param m:
     :return:

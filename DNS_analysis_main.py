@@ -242,6 +242,10 @@ class dns_analysis_base(object):
             data_filtered = sp.ndimage.filters.uniform_filter(data, [self.filter_width,self.filter_width,self.filter_width],mode='wrap')
             return data_filtered
 
+        elif self.filter_type == 'TOPHAT_REFLECT':
+            data_filtered = sp.ndimage.filters.uniform_filter(data, [self.filter_width,self.filter_width,self.filter_width],mode='reflect')
+            return data_filtered
+
         else:
             sys.exit('No fitler type provided ...')
 
@@ -3389,7 +3393,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
                                           self.UP_delta.reshape(self.Nx * self.Ny * self.Nz, 1),
                                     ])
 
-        filename = join(self.case, 'postProcess_UVW/filter_width_' + self.filter_type + '_' + str(self.filter_width) + '_tilde.pkl')
+        filename = join(self.case, 'postProcess_UVW/filter_width_' + str(self.filter_width) + '_tilde.pkl')
 
         dataArray_dd = dd.io.from_dask_array(self.dataArray_da,columns=
                                                   ['c_bar',
