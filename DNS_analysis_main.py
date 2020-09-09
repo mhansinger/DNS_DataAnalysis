@@ -3431,3 +3431,352 @@ class dns_analysis_tensors(dns_analysis_UVW):
     def run_analysis_UVW(self,filter_width ,filter_type, c_analytical=False):
         return NotImplementedError
 
+
+
+
+
+
+
+################################################
+# Prepare data sets for DNN regression of omega_filtered
+# 8.9.2020
+
+class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
+    '''
+        Analysis includes now the velocity data
+    '''
+
+    def __init__(self,case, eps_factor,c_iso_values):
+        # extend super class with additional input parameters
+        super(dns_analysis_prepareDNN, self).__init__(case, eps_factor,c_iso_values)
+
+        print('This is the version that prepares the data for DNN regression ...')
+
+        self.U = None
+        self.V = None
+        self.W = None
+
+        self.U_bar = None
+        self.V_bar = None
+        self.W_bar = None
+
+        self.U_prime = None
+        self.V_prime = None
+        self.W_prime = None
+
+        # create empty array
+        self.grad_U_bar = np.zeros([self.Nx, self.Ny, self.Nz])
+        self.grad_V_bar = np.zeros([self.Nx, self.Ny, self.Nz])
+        self.grad_W_bar = np.zeros([self.Nx, self.Ny, self.Nz])
+
+    # constructor end
+
+
+    def read_UVW(self):
+        '''
+        reads in the velocity fields and stores it as np.array. 3D!!
+        :return: nothing
+        '''
+
+        print('Reading the velocity data ...')
+
+        U_np = pd.read_csv(join(self.case, 'U.dat'), names=['U']).values.astype(dtype=np.float32)
+        V_np = pd.read_csv(join(self.case, 'V.dat'), names=['U']).values.astype(dtype=np.float32)
+        W_np = pd.read_csv(join(self.case, 'W.dat'), names=['U']).values.astype(dtype=np.float32)
+
+        self.U = U_np.reshape(self.Nx,self.Ny,self.Nz)
+        self.V = V_np.reshape(self.Nx,self.Ny,self.Nz)
+        self.W = W_np.reshape(self.Nx,self.Ny,self.Nz)
+
+        # delete to save memory
+        del U_np, V_np, W_np
+
+    #@jit(nopython=True, parallel=True)
+    def compute_U_prime(self):
+        '''
+        # compute the SGS velocity fluctuations
+        # u_prime is the STD of the U-DNS components within a LES cell
+        :return: nothing
+        '''
+        print('Computing U prime')
+        self.U_prime = scipy.ndimage.generic_filter(self.U, np.var, mode='wrap',
+                                                    size=(self.filter_width, self.filter_width,self.filter_width))
+        print('Computing V prime')
+        self.V_prime = scipy.ndimage.generic_filter(self.V, np.var, mode='wrap',
+                                                    size=(self.filter_width, self.filter_width, self.filter_width))
+        print('Computing W prime')
+        self.W_prime = scipy.ndimage.generic_filter(self.W, np.var, mode='wrap',
+                                                    size=(self.filter_width, self.filter_width, self.filter_width))
+
+
+    def compute_sgs_flux(self):
+        '''
+        Computes the SGS scalar flux: research_progress_shin_8.pdf: slide 6
+        :return:
+        '''
+        print('computing SGS scalar flux ...')
+        # compute the components of u*c
+        U_c_bar = self.apply_filter(self.c_data_np * self.U)
+        V_c_bar = self.apply_filter(self.c_data_np * self.V)
+        W_c_bar = self.apply_filter(self.c_data_np * self.W)
+
+        TAU_11 = U_c_bar - self.c_filtered * self.U_bar
+        TAU_22 = V_c_bar - self.c_filtered * self.V_bar
+        TAU_33 = W_c_bar - self.c_filtered * self.W_bar
+
+        self.SGS_scalar_flux = np.sqrt(TAU_11 **2 + TAU_22 ** 2 + TAU_33**2)
+
+    def compute_UP_delta(self):
+        '''
+        #compute U_prime sgs according to Junsu, slide 6, research_progress_shin_8.pptx
+        :return:
+        '''
+
+        print('computing UP_delta ...')
+
+        U_rho_bar = self.apply_filter(self.U*self.rho_data_np)
+        V_rho_bar = self.apply_filter(self.V*self.rho_data_np)
+        W_rho_bar = self.apply_filter(self.W*self.rho_data_np)
+
+        UU_rho_bar = self.apply_filter(self.U*self.U*self.rho_data_np)
+        VV_rho_bar = self.apply_filter(self.V*self.V*self.rho_data_np)
+        WW_rho_bar = self.apply_filter(self.W*self.W*self.rho_data_np)
+
+        TAU11 = UU_rho_bar - (U_rho_bar**2 / self.rho_filtered)
+        TAU22 = VV_rho_bar - (V_rho_bar**2 / self.rho_filtered)
+        TAU33 = WW_rho_bar - (W_rho_bar**2 / self.rho_filtered)
+
+        self.UP_delta = np.sqrt((TAU11+TAU22+TAU33)/(3.0*self.rho_filtered) )
+
+    #@jit(nopython=True, parallel=True)
+    def compute_gradU_LES_4thO(self):
+        # '''
+        # Compute the magnitude of the gradient of the DNS c-field, based on neighbour cells
+        # 4th Order central differencing
+        # :return: nothing
+        # '''
+
+        print('Computing gradients of U_bar on DNS mesh 4th Order...')
+
+        # compute gradients from the boundaries away ...
+        for l in range(2,self.Nx-2):
+            for m in range(2,self.Ny-2):
+                for n in range(2,self.Nz-2):
+                    this_U_gradX = (-self.U_bar[l+2, m, n] + 8*self.U_bar[l+1,m, n] - 8*self.U_bar[l-1,m, n] + self.U_bar[l-2, m, n])/(12 * self.delta_x)
+                    this_U_gradY = (-self.U_bar[l, m+2, n] + 8*self.U_bar[l,m+1, n] - 8*self.U_bar[l,m-1, n] + self.U_bar[l, m-2, n])/(12 * self.delta_x)
+                    this_U_gradZ = (-self.U_bar[l, m, n+2] + 8*self.U_bar[l,m, n+1] - 8*self.U_bar[l,m, n-1] + self.U_bar[l, m, n+2])/(12 * self.delta_x)
+
+                    this_V_gradX = (-self.V_bar[l+2, m, n] + 8*self.V_bar[l+1,m, n] - 8*self.V_bar[l-1,m, n] + self.V_bar[l-2, m, n])/(12 * self.delta_x)
+                    this_V_gradY = (-self.V_bar[l, m+2, n] + 8*self.V_bar[l,m+1, n] - 8*self.V_bar[l,m-1, n] + self.V_bar[l, m-2, n])/(12 * self.delta_x)
+                    this_V_gradZ = (-self.V_bar[l, m, n+2] + 8*self.V_bar[l,m, n+1] - 8*self.V_bar[l,m, n-1] + self.V_bar[l, m, n+2])/(12 * self.delta_x)
+
+                    this_W_gradX = (-self.W_bar[l+2, m, n] + 8*self.W_bar[l+1,m, n] - 8*self.W_bar[l-1,m, n] + self.W_bar[l-2, m, n])/(12 * self.delta_x)
+                    this_W_gradY = (-self.W_bar[l, m+2, n] + 8*self.W_bar[l,m+1, n] - 8*self.W_bar[l,m-1, n] + self.W_bar[l, m-2, n])/(12 * self.delta_x)
+                    this_W_gradZ = (-self.W_bar[l, m, n+2] + 8*self.W_bar[l,m, n+1] - 8*self.W_bar[l,m, n-1] + self.W_bar[l, m, n+2])/(12 * self.delta_x)
+
+                    # compute the magnitude of the gradient
+                    this_magGrad_U = np.sqrt(this_U_gradX ** 2 + this_U_gradY ** 2 + this_U_gradZ ** 2)
+                    this_magGrad_V = np.sqrt(this_V_gradX ** 2 + this_V_gradY ** 2 + this_V_gradZ ** 2)
+                    this_magGrad_W = np.sqrt(this_W_gradX ** 2 + this_W_gradY ** 2 + this_W_gradZ ** 2)
+
+                    self.grad_U_bar[l, m, n] = this_magGrad_U
+                    self.grad_V_bar[l, m, n] = this_magGrad_V
+                    self.grad_W_bar[l, m, n] = this_magGrad_W
+
+    def crop_reshape_dataset(self,data):
+        '''
+        Crop the boundaries from the cube: Nx-filter_width at each side. Reshape it to a vector
+        :param data:
+        :return:
+        '''
+
+        assert data.shape[0] == self.Nx
+
+        new_length = self.Nx - 2*self.filter_width
+        # crop the data
+        data = data[self.filter_width:self.Nx-self.filter_width, self.filter_width:self.Nx-self.filter_width, self.filter_width:self.Nx-self.filter_width]
+
+        # reshape  cube to vector
+        data = data.reshape(new_length**3,1)
+
+        return data
+
+
+    def run_analysis_DNN(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        ##Todo: muss noch überarbeitet werden!
+
+        self.every_nth = 1
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        #('Reading in U fieds ...')
+        self.read_UVW()
+
+        # filter the c and rho field
+        print('Filtering c field ')
+        #self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.rho_filtered = self.apply_filter(self.rho_data_np)
+
+        #Todo: In paralllel? How?
+        print('Filtering U components')
+        self.U_bar = self.apply_filter(self.U)
+        self.V_bar = self.apply_filter(self.V)
+        self.W_bar = self.apply_filter(self.W)
+
+        #############################
+        # Compute gradients of c_bar with Cython
+        # print('Computing x,y,z gradients of c_bar on LES mesh 4th Order with Cython')
+        # grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_filtered, dtype=np.float32),
+        #                                               self.Nx, self.Ny, self.Nz, np.float32(self.delta_x), int(self.filter_width))
+
+        # grad_c_x_LES = np.asarray(grad_c_x_LES)
+        # grad_c_y_LES = np.asarray(grad_c_y_LES)
+        # grad_c_z_LES = np.asarray(grad_c_z_LES)
+
+        print('Computing x,y,z gradients of c_bar on LES mesh')
+        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = np.gradient(self.c_filtered,int(self.filter_width))
+
+        print('Compute UP_delta')
+        self.compute_UP_delta()
+
+        print('Compute Scalar flux')
+        self.compute_sgs_flux()
+
+        # ###########################
+        # compute the magnitude of gradients of the velocity field on the LES mesh
+        #self.compute_gradU_LES_4thO()
+        # use imported cython function: dtype needs to be float32!
+        # grad_U_x_LES, grad_V_x_LES, grad_W_x_LES, grad_U_y_LES, grad_V_y_LES, grad_W_y_LES, grad_U_z_LES, grad_V_z_LES, grad_W_z_LES = \
+        #                                                             compute_gradU_LES_4thO_tensor_cython(
+        #                                                             np.ascontiguousarray(self.U_bar, dtype=np.float32),
+        #                                                             np.ascontiguousarray(self.V_bar, dtype=np.float32),
+        #                                                             np.ascontiguousarray(self.W_bar, dtype=np.float32),
+        #                                                             self.Nx, self.Ny, self.Nz,
+        #                                                             np.float32(self.delta_x),int(self.filter_width))
+
+        # # #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+        # grad_U_x_LES = np.asarray(grad_U_x_LES)
+        # grad_V_x_LES = np.asarray(grad_V_x_LES)
+        # grad_W_x_LES = np.asarray(grad_W_x_LES)
+        # grad_U_y_LES = np.asarray(grad_U_y_LES)
+        # grad_V_y_LES = np.asarray(grad_V_y_LES)
+        # grad_W_y_LES = np.asarray(grad_W_y_LES)
+        # grad_U_z_LES = np.asarray(grad_U_z_LES)
+        # grad_V_z_LES = np.asarray(grad_V_z_LES)
+        # grad_W_z_LES = np.asarray(grad_W_z_LES)
+
+        # #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+        print('Computing x,y,z gradients of Velocity on LES mesh')
+        grad_U_x_LES, grad_U_y_LES, grad_U_z_LES = np.gradient(self.U_bar,int(self.filter_width))
+        grad_V_x_LES, grad_V_y_LES, grad_V_z_LES = np.gradient(self.V_bar,int(self.filter_width))
+        grad_W_x_LES, grad_W_y_LES, grad_W_z_LES = np.gradient(self.W_bar,int(self.filter_width))
+
+        ###########################
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+
+
+        ###########################
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        # # 2nd method to compute Xi
+        # Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
+
+        # #creat dask array and reshape all data
+
+        output_list =[self.c_filtered,
+                                  self.omega_DNS_filtered,
+                                  self.omega_model_cbar,
+                                  self.U_bar,
+                                  self.V_bar,
+                                  self.W_bar,
+                                  grad_c_x_LES,
+                                  grad_c_y_LES,
+                                  grad_c_z_LES,
+                                    grad_U_x_LES,
+                                    grad_V_x_LES,
+                                    grad_W_x_LES,
+                                    grad_U_y_LES,
+                                    grad_V_y_LES,
+                                    grad_W_y_LES,
+                                    grad_U_z_LES,
+                                    grad_V_z_LES,
+                                    grad_W_z_LES,
+                                    self.UP_delta,
+                                    self.SGS_scalar_flux,
+                                  ]
+
+        output_names =['c_bar',
+                         # 'mag_grad_c_bar',
+                         'omega_DNS_filtered',
+                         'omega_model_planar',
+                         'U_bar',
+                         'V_bar',
+                         'W_bar',
+                         'grad_c_x_LES',
+                         'grad_c_y_LES',
+                         'grad_c_z_LES',
+                         'grad_U_x_LES',
+                         'grad_V_x_LES',
+                         'grad_W_x_LES',
+                         'grad_U_y_LES',
+                         'grad_V_y_LES',
+                         'grad_W_y_LES',
+                         'grad_U_z_LES',
+                         'grad_V_z_LES',
+                         'grad_W_z_LES',
+                         'UP_delta',
+                         'SGS_flux'
+                         ]
+
+        # reshape and crop the list that is to be written to file
+        output_list = [self.crop_reshape_dataset(x) for x in output_list]
+
+        self.dataArray_da = da.hstack(output_list)
+
+
+        filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_DNN')
+
+        dataArray_dd = dd.io.from_dask_array(self.dataArray_da,columns=output_names)
+
+        # # filter the data set and remove unecessary entries
+        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
+        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.999]
+        #
+        # dataArray_dd = dataArray_dd[dataArray_dd['grad_U'] != 0.0]
+
+        print('Computing data array ...')
+        dataArray_df = dataArray_dd.compute()
+
+        print('Writing output to hdf ...')
+        # dataArray_df.to_pickle(filename+'.pkl')
+        dataArray_df.to_hdf(filename + '.hdf',key='DNS',format='table')
+        # dataArray_df.to_parquet(filename + '.pq')
+        print('Data has been written.\n\n')
+
+
