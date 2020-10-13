@@ -3615,17 +3615,22 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         :return:
         '''
 
-        test_range=range(236,276)   # indices of data locations to extract from the cube
-        len_test_range = len(test_range)
+        id_start = 210
+        id_end = 290
+
+        test_range=range(id_start,id_end)   # indices of data locations to extract from the cube
+        len_test_range = id_end - id_start
 
         assert data.shape[0] == self.Nx
 
-        data_test = data[test_range,test_range,test_range]
+        data_test = data[id_start:id_end,id_start:id_end,id_start:id_end]
+
+        print("data_test.shape: ", data_test.shape)
 
         data_train = data
 
         # set the training data to zero in the location where test data is extracted
-        data_train[test_range,test_range,test_range] = 0
+        data_train[id_start:id_end,id_start:id_end,id_start:id_end] = 0
 
         new_length = self.Nx - 2*self.filter_width
         # crop the data
