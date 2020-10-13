@@ -968,7 +968,7 @@ class dns_analysis_wrinkling(dns_analysis_base):
         self.c_filtered = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
-        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        self.Delta_LES = self.delta_x * self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
         print('Delta_LES is: %.3f' % self.Delta_LES)
         flame_thickness = self.compute_flamethickness()
         print('Flame thickness: ',flame_thickness)
@@ -3433,10 +3433,6 @@ class dns_analysis_tensors(dns_analysis_UVW):
 
 
 
-
-
-
-
 ################################################
 # Prepare data sets for DNN regression of omega_filtered
 # 8.9.2020
@@ -3446,11 +3442,21 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         Analysis includes now the velocity data
     '''
 
-    def __init__(self,case, eps_factor,c_iso_values):
+    def __init__(self,case,data_format ):
         # extend super class with additional input parameters
+
+        # hard coded default values
+        eps_factor=1
+        c_iso_values =[0.85]
+
         super(dns_analysis_prepareDNN, self).__init__(case, eps_factor,c_iso_values)
 
         print('This is the version that prepares the data for DNN regression ...')
+
+        self.data_format = data_format
+        print('**********')
+        print('wirte data to format: ',data_format)
+        print('**********')
 
         self.U = None
         self.V = None
@@ -3601,6 +3607,36 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         return data
 
+    def crop_split_dataset(self,data):
+        '''
+        split in train test data set consistently for all data sets!
+        Crop the boundaries from the cube: Nx-filter_width at each side. Reshape it to a vector
+        :param data:
+        :return:
+        '''
+
+        test_range=range(236,276)   # indices of data locations to extract from the cube
+        len_test_range = len(test_range)
+
+        assert data.shape[0] == self.Nx
+
+        data_test = data[test_range,test_range,test_range]
+
+        data_train = data
+
+        # set the training data to zero in the location where test data is extracted
+        data_train[test_range,test_range,test_range] = 0
+
+        new_length = self.Nx - 2*self.filter_width
+        # crop the data
+        data_train = data_train[self.filter_width:self.Nx-self.filter_width, self.filter_width:self.Nx-self.filter_width, self.filter_width:self.Nx-self.filter_width]
+
+        # reshape  cube to vector
+        data_train = data_train.reshape(new_length**3,1)
+        data_test = data_test.reshape(len_test_range**3,1)
+
+        return data_train, data_test
+
 
     def run_analysis_DNN(self,filter_width ,filter_type, c_analytical=False):
         '''
@@ -3729,6 +3765,9 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                                     grad_W_z_LES,
                                     self.UP_delta,
                                     self.SGS_scalar_flux,
+                                    # add the filter width as information and perturb it slightly
+                                    np.ones((self.Nx,self.Ny,self.Nz))*self.Delta_LES +
+                                        (np.random.rand(self.Nx,self.Ny,self.Nz)*1e-6)
                                   ]
 
         output_names =['c_bar',
@@ -3751,32 +3790,59 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                          'grad_V_z_LES',
                          'grad_W_z_LES',
                          'UP_delta',
-                         'SGS_flux'
+                         'SGS_flux',
+                         'Delta_LES'
                          ]
 
         # reshape and crop the list that is to be written to file
-        output_list = [self.crop_reshape_dataset(x) for x in output_list]
+        output_test = []
+        output_train = []
 
-        self.dataArray_da = da.hstack(output_list)
+        for x in output_list:
+            this_train, this_test = self.crop_split_dataset(x)
+
+            output_train.append(this_train)
+            output_test.append(this_test)
+
+
+        #output_list = [self.crop_reshape_dataset(x) for x in output_list]
+
+        dataArray_train_da = da.hstack(output_train)
+        dataArray_test_da = da.hstack(output_test)
 
 
         filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_DNN')
 
-        dataArray_dd = dd.io.from_dask_array(self.dataArray_da,columns=output_names)
+        dataArray_train_dd = dd.io.from_dask_array(dataArray_train_da,columns=output_names)
+        dataArray_test_dd = dd.io.from_dask_array(dataArray_test_da, columns=output_names)
 
-        # # filter the data set and remove unecessary entries
-        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] > 0.001]
-        # dataArray_dd = dataArray_dd[dataArray_dd['c_bar'] < 0.999]
-        #
-        # dataArray_dd = dataArray_dd[dataArray_dd['grad_U'] != 0.0]
+        # filter the data set and remove unecessary entries
+        print('filtering for c<0.99 & c>0.01 ...')
+        dataArray_train_dd = dataArray_train_dd[(dataArray_train_dd['c_bar'] > 0.01) &(dataArray_train_dd['c_bar'] < 0.99)]
+        dataArray_test_dd = dataArray_test_dd[(dataArray_test_dd['c_bar'] > 0.01) &(dataArray_test_dd['c_bar'] < 0.99)]
 
-        print('Computing data array ...')
-        dataArray_df = dataArray_dd.compute()
 
-        print('Writing output to hdf ...')
-        # dataArray_df.to_pickle(filename+'.pkl')
-        dataArray_df.to_hdf(filename + '.hdf',key='DNS',format='table')
-        # dataArray_df.to_parquet(filename + '.pq')
+        if self.data_format == 'hdf':
+            print('Writing output to hdf ...')
+            dataArray_df = dataArray_train_dd.compute()
+            dataArray_df.to_hdf(filename + '_train.hdf',key='DNS',format='table')
+            dataArray_df = dataArray_test_dd.compute()
+            dataArray_df.to_hdf(filename + '_test.hdf', key='DNS', format='table')
+
+        elif self.data_format == 'parquet':
+            print('Writing output to parquet ...')
+            dataArray_df = dataArray_train_dd.compute()
+            dataArray_df.to_parquet(filename + '_train.parquet')
+            dataArray_df = dataArray_test_dd.compute()
+            dataArray_df.to_parquet(filename + '_test.parquet')
+
+        elif self.data_format == 'csv':
+            print('Writing output to csv ..')
+            dataArray_df = dataArray_train_dd.compute()
+            dataArray_df.to_csv(filename + '_train.csv')
+            dataArray_df = dataArray_test_dd.compute()
+            dataArray_df.to_csv(filename + '_test.csv')
+
         print('Data has been written.\n\n')
 
 

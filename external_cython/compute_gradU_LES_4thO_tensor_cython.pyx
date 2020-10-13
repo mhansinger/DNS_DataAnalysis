@@ -21,7 +21,7 @@ ctypedef np.float_t DTYPE_t
 # cpdef or cdef does not matter in speed tests
 cpdef compute_gradU_LES_4thO_tensor_cython(float[:, :, ::1] U_bar, float[:, :, ::1] V_bar, float[:, :, ::1] W_bar, int Nx, int Ny, int Nz, float delta_x, int filter_width):
     # '''
-    # Compute the magnitude of the gradient of the DNS c-field, based on neighbour cells
+    # Compute the magnitude of the gradient of the LES U-field, based on neighbour cells
     # 4th Order central differencing
     # :return: nothing
     # '''
