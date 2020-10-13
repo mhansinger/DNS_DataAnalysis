@@ -3640,6 +3640,8 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         data_train = data_train.reshape(new_length**3,1)
         data_test = data_test.reshape(len_test_range**3,1)
 
+        print(data_test)
+
         return data_train, data_test
 
 
@@ -3839,6 +3841,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
             dataArray_df = dataArray_train_dd.compute()
             dataArray_df.to_parquet(filename + '_train.parquet')
             dataArray_df = dataArray_test_dd.compute()
+            print(dataArray_df)
             dataArray_df.to_parquet(filename + '_test.parquet')
 
         elif self.data_format == 'csv':
