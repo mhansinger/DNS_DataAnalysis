@@ -3623,9 +3623,10 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         assert data.shape[0] == self.Nx
 
-        data_test = data[id_start:id_end,id_start:id_end,id_start:id_end]
+        data_test = data[id_start:id_end,id_start:id_end,id_start:id_end].copy()
 
-        print("data_test.shape: ", data_test.shape)
+        #print("data[id_start:id_end,id_start:id_end,id_start:id_end]")
+        #print(data[id_start:id_end,id_start:id_end,id_start:id_end])
 
         data_train = data
 
@@ -3639,8 +3640,9 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         # reshape  cube to vector
         data_train = data_train.reshape(new_length**3,1)
         data_test = data_test.reshape(len_test_range**3,1)
-
-        print(data_test)
+        
+        #print("data_test")
+        #print(data_test)
 
         return data_train, data_test
 
@@ -3817,8 +3819,11 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         dataArray_train_da = da.hstack(output_train)
         dataArray_test_da = da.hstack(output_test)
 
+        print(output_test)
 
-        filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_DNN')
+        case_name = self.case.split('/')[1]
+
+        filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_DNN_'+case_name)
 
         dataArray_train_dd = dd.io.from_dask_array(dataArray_train_da,columns=output_names)
         dataArray_test_dd = dd.io.from_dask_array(dataArray_test_da, columns=output_names)
