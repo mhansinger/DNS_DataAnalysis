@@ -3811,7 +3811,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                          'UP_delta',
                          'SGS_flux',
                          'c_prime',
-                         'Delta_LES'
+                         'Delta_LES',
                           'filter_width'
                          ]
 
