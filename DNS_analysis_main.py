@@ -3785,7 +3785,8 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                                     self.c_prime,
                                     # add the filter width as information and perturb it slightly
                                     np.ones((self.Nx,self.Ny,self.Nz))*self.Delta_LES +
-                                        (np.random.rand(self.Nx,self.Ny,self.Nz)*1e-6)
+                                        (np.random.rand(self.Nx,self.Ny,self.Nz)*1e-6),
+                                    np.ones((self.Nx, self.Ny, self.Nz)) * self.filter_width
                                   ]
 
         output_names =['c_bar',
@@ -3811,6 +3812,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                          'SGS_flux',
                          'c_prime',
                          'Delta_LES'
+                          'filter_width'
                          ]
 
         # reshape and crop the list that is to be written to file
