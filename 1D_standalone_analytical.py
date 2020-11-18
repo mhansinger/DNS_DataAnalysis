@@ -5,7 +5,7 @@ This is to plot the Histograms from 1D profiles
 # %%
 
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 from scipy.interpolate import interp1d
 from scipy.interpolate import splrep, splev
