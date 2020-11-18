@@ -3455,7 +3455,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         self.data_format = data_format
         print('**********')
-        print('wirte data to format: ',data_format)
+        print('Output data to format: ',data_format)
         print('**********')
 
         self.U = None
@@ -3625,9 +3625,6 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         data_test = data[id_start:id_end,id_start:id_end,id_start:id_end].copy()
 
-        #print("data[id_start:id_end,id_start:id_end,id_start:id_end]")
-        #print(data[id_start:id_end,id_start:id_end,id_start:id_end])
-
         data_train = data
 
         # set the training data to zero in the location where test data is extracted
@@ -3640,9 +3637,6 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         # reshape  cube to vector
         data_train = data_train.reshape(new_length**3,1)
         data_test = data_test.reshape(len_test_range**3,1)
-        
-        #print("data_test")
-        #print(data_test)
 
         return data_train, data_test
 
@@ -3819,8 +3813,6 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         dataArray_train_da = da.hstack(output_train)
         dataArray_test_da = da.hstack(output_test)
 
-        print(output_test)
-
         case_name = self.case.split('/')[1]
 
         filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_DNN_'+case_name)
@@ -3830,8 +3822,8 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         # filter the data set and remove unecessary entries
         print('filtering for c<0.99 & c>0.01 ...')
-        dataArray_train_dd = dataArray_train_dd[(dataArray_train_dd['c_bar'] > 0.01) &(dataArray_train_dd['c_bar'] < 0.99)]
-        dataArray_test_dd = dataArray_test_dd[(dataArray_test_dd['c_bar'] > 0.01) &(dataArray_test_dd['c_bar'] < 0.99)]
+        dataArray_train_dd = dataArray_train_dd[(dataArray_train_dd['c_bar'] > 0.01) &(dataArray_train_dd['c_bar'] < 0.99)].sample(frac=1.0)
+        dataArray_test_dd = dataArray_test_dd[(dataArray_test_dd['c_bar'] > 0.01) &(dataArray_test_dd['c_bar'] < 0.99)].sample(frac=1.0)
 
 
         if self.data_format == 'hdf':
