@@ -2471,6 +2471,8 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         self.V_prime = None
         self.W_prime = None
 
+        self.c_prime = None
+
         # create empty array
         self.grad_U_bar = np.zeros([self.Nx, self.Ny, self.Nz])
         self.grad_V_bar = np.zeros([self.Nx, self.Ny, self.Nz])
@@ -2514,6 +2516,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         print('Computing W prime')
         self.W_prime = scipy.ndimage.generic_filter(self.W, np.var, mode='wrap',
                                                     size=(self.filter_width, self.filter_width, self.filter_width))
+
 
     def compute_U_prime_alternative(self,U,V,W,Nx,Ny,Nz, filter_width):
 
@@ -3514,6 +3517,14 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         self.W_prime = scipy.ndimage.generic_filter(self.W, np.var, mode='wrap',
                                                     size=(self.filter_width, self.filter_width, self.filter_width))
 
+    def compute_c_prime(self):
+        '''
+        computes the subgrid variance of c in the LES box
+        :return: nothing
+        '''
+        print('Computing c prime')
+        self.c_prime = scipy.ndimage.generic_filter(self.c_data_np, np.var, mode='wrap',
+                                                    size=(self.filter_width, self.filter_width,self.filter_width))
 
     def compute_sgs_flux(self):
         '''
@@ -3738,10 +3749,13 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
 
 
-
         ###########################
         # compute omega based on pfitzner
         self.compute_Pfitzner_model()
+
+        ##########################
+        # compute c_prime
+        self.compute_c_prime()
 
         # # 2nd method to compute Xi
         # Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
@@ -3768,6 +3782,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                                     grad_W_z_LES,
                                     self.UP_delta,
                                     self.SGS_scalar_flux,
+                                    self.c_prime,
                                     # add the filter width as information and perturb it slightly
                                     np.ones((self.Nx,self.Ny,self.Nz))*self.Delta_LES +
                                         (np.random.rand(self.Nx,self.Ny,self.Nz)*1e-6)
@@ -3794,6 +3809,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                          'grad_W_z_LES',
                          'UP_delta',
                          'SGS_flux',
+                         'c_prime',
                          'Delta_LES'
                          ]
 
