@@ -3844,6 +3844,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         mag_vor = mag_vor.reshape(self.Nx,self.Ny,self.Nz)
         mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
 
+        del omega_x, omega_y, omega_z
 
         # #creat dask array and reshape all data
         output_list =[self.c_filtered,
@@ -3858,6 +3859,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                                   lambda_3,
                                   sum_U,
                                   sum_c,
+                                    sum_grad_U,
                                   # self.U_bar,
                                   # self.V_bar,
                                   # self.W_bar,
@@ -3890,11 +3892,12 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                        'mag_grad_U',
                        'mag_grad_c',
                        'mag_strain',
-                       'mag_vor',
+                       'mag_vorticity',   # magnitude vorticity
                        'lambda_1',
                        'lambda_3',
                        'sum_U',
                        'sum_c',
+                       'sum_grad_U',
                          # 'U_bar',
                          # 'V_bar',
                          # 'W_bar',
