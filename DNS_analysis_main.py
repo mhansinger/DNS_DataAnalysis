@@ -3658,6 +3658,12 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         :return: Strain, Anti
         '''
 
+        try:
+            assert gradient_tensor.shape == (3,3,self.Nx*self.Ny*self.Nz)
+        except AssertionError:
+            print("Error in compute_S_R")
+            sys.exit()
+
         print('Computing S and R')
 
         length = gradient_tensor.shape[-1]
@@ -3783,26 +3789,90 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         # # 2nd method to compute Xi
         # Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
 
-        # #creat dask array and reshape all data
+        mag_U = np.sqrt(self.U_bar**2 + self.V_bar**2 +self.W_bar**2)
+        mag_grad_c = np.sqrt(grad_c_x_LES**2 + grad_c_y_LES**2 + grad_c_z_LES**2)
 
+        sum_U = np.absolute(self.U_bar) + np.absolute(self.V_bar)+np.absolute(self.W_bar)
+        sum_c = np.absolute(grad_c_x_LES) + np.absolute(grad_c_y_LES) +np.absolute(grad_c_z_LES)
+
+        grad_U = np.sqrt(grad_U_x_LES**2 + grad_U_y_LES**2 +grad_U_z_LES**2)
+        grad_V = np.sqrt(grad_V_x_LES**2 + grad_V_y_LES**2 +grad_V_z_LES**2)
+        grad_W = np.sqrt(grad_W_x_LES**2 + grad_W_y_LES**2 +grad_W_z_LES**2)
+
+        mag_grad_U = np.sqrt(grad_U**2 + grad_V**2 + grad_W**2)
+        sum_grad_U = np.absolute(grad_U) + np.absolute(grad_V) + np.absolute(grad_W)
+
+        del grad_U, grad_V, grad_W
+
+        print('Computing gradient_tensor')
+
+        gradient_tensor = np.array([
+                            [grad_U_x_LES.reshape(self.Nx*self.Ny*self.Nz),grad_V_x_LES.reshape(self.Nx*self.Ny*self.Nz),grad_W_x_LES.reshape(self.Nx*self.Ny*self.Nz)],
+                            [grad_U_y_LES.reshape(self.Nx*self.Ny*self.Nz),grad_V_y_LES.reshape(self.Nx*self.Ny*self.Nz),grad_W_y_LES.reshape(self.Nx*self.Ny*self.Nz)],
+                            [grad_U_z_LES.reshape(self.Nx*self.Ny*self.Nz),grad_V_z_LES.reshape(self.Nx*self.Ny*self.Nz),grad_W_z_LES.reshape(self.Nx*self.Ny*self.Nz)]
+                            ])
+
+        del grad_V_x_LES, grad_V_y_LES, grad_V_z_LES, grad_W_x_LES, grad_W_y_LES,grad_W_z_LES, grad_U_x_LES, grad_U_y_LES, grad_U_z_LES
+
+        # THESE ARE NOW ARRAYS in the FORM (3,3,self.Nx*self.Ny*self.Nz), no cubic shape
+        Strain, Anti = self.compute_S_R(gradient_tensor=gradient_tensor)
+
+        del gradient_tensor
+
+        print('Computing lambdas')
+
+        lambda_1 = np.trace(Strain**2)
+        #lambda_2 = np.trace(Anti**2)
+        lambda_3 = np.trace(Strain**3)
+        #lambda_4 = np.trace(Anti**2 * Strain)
+        #lambda_5 = np.trace(Anti**2 * Strain**2)
+
+        # convert to 3D
+        lambda_1 = lambda_1.reshape(self.Nx,self.Ny, self.Nz)
+        lambda_3 = lambda_3.reshape(self.Nx,self.Ny, self.Nz)
+
+        # features of Junsu
+        omega_x = Anti[1, 2,:] - Anti[2, 1,:]
+        omega_y = Anti[0, 2,:] - Anti[2, 0,:]
+        omega_z = Anti[0, 1,:] - Anti[1, 0,:]
+
+        # Magnitude of vorticity and strain
+        mag_vor = np.sqrt(omega_x * omega_x + omega_y * omega_y + omega_z * omega_z)
+        mag_strain = np.sqrt(Strain[0, 0,:] * Strain[0, 0,:] + Strain[1, 1,:] * Strain[1, 1,:] + Strain[2, 2,:] * Strain[2, 2,:])
+
+        # convert to 3D
+        mag_vor = mag_vor.reshape(self.Nx,self.Ny,self.Nz)
+        mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
+
+
+        # #creat dask array and reshape all data
         output_list =[self.c_filtered,
                                   self.omega_DNS_filtered,
                                   self.omega_model_cbar,
-                                  self.U_bar,
-                                  self.V_bar,
-                                  self.W_bar,
-                                  grad_c_x_LES,
-                                  grad_c_y_LES,
-                                  grad_c_z_LES,
-                                    grad_U_x_LES,
-                                    grad_V_x_LES,
-                                    grad_W_x_LES,
-                                    grad_U_y_LES,
-                                    grad_V_y_LES,
-                                    grad_W_y_LES,
-                                    grad_U_z_LES,
-                                    grad_V_z_LES,
-                                    grad_W_z_LES,
+                                  mag_U,
+                                  mag_grad_U,
+                                  mag_grad_c,
+                                  mag_strain,
+                                  mag_vor,
+                                  lambda_1,
+                                  lambda_3,
+                                  sum_U,
+                                  sum_c,
+                                  # self.U_bar,
+                                  # self.V_bar,
+                                  # self.W_bar,
+                                  # grad_c_x_LES,
+                                  # grad_c_y_LES,
+                                  # grad_c_z_LES,
+                                  #   grad_U_x_LES,
+                                  #   grad_V_x_LES,
+                                  #   grad_W_x_LES,
+                                  #   grad_U_y_LES,
+                                  #   grad_V_y_LES,
+                                  #   grad_W_y_LES,
+                                  #   grad_U_z_LES,
+                                  #   grad_V_z_LES,
+                                  #   grad_W_z_LES,
                                     self.UP_delta,
                                     self.SGS_scalar_flux,
                                     self.c_prime,
@@ -3816,21 +3886,30 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                          # 'mag_grad_c_bar',
                          'omega_DNS_filtered',
                          'omega_model_planar',
-                         'U_bar',
-                         'V_bar',
-                         'W_bar',
-                         'grad_c_x_LES',
-                         'grad_c_y_LES',
-                         'grad_c_z_LES',
-                         'grad_U_x_LES',
-                         'grad_V_x_LES',
-                         'grad_W_x_LES',
-                         'grad_U_y_LES',
-                         'grad_V_y_LES',
-                         'grad_W_y_LES',
-                         'grad_U_z_LES',
-                         'grad_V_z_LES',
-                         'grad_W_z_LES',
+                       'mag_U',
+                       'mag_grad_U',
+                       'mag_grad_c',
+                       'mag_strain',
+                       'mag_vor',
+                       'lambda_1',
+                       'lambda_3',
+                       'sum_U',
+                       'sum_c',
+                         # 'U_bar',
+                         # 'V_bar',
+                         # 'W_bar',
+                         # 'grad_c_x_LES',
+                         # 'grad_c_y_LES',
+                         # 'grad_c_z_LES',
+                         # 'grad_U_x_LES',
+                         # 'grad_V_x_LES',
+                         # 'grad_W_x_LES',
+                         # 'grad_U_y_LES',
+                         # 'grad_V_y_LES',
+                         # 'grad_W_y_LES',
+                         # 'grad_U_z_LES',
+                         # 'grad_V_z_LES',
+                         # 'grad_W_z_LES',
                          'UP_delta',
                          'SGS_flux',
                          'c_prime',
@@ -3848,8 +3927,8 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
             output_train.append(this_train)
             output_test.append(this_test)
 
-        del output_list, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES, grad_U_x_LES, grad_U_y_LES, grad_U_z_LES
-        del grad_V_x_LES, grad_V_y_LES, grad_V_z_LES, grad_W_x_LES, grad_W_y_LES,grad_W_z_LES
+        del output_list, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES,
+
         print('Del output')
 
         #output_list = [self.crop_reshape_dataset(x) for x in output_list]
@@ -3869,6 +3948,9 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         dataArray_train_dd = dataArray_train_dd[(dataArray_train_dd['c_bar'] > 0.01) &(dataArray_train_dd['c_bar'] < 0.99)].sample(frac=1.0)
         dataArray_test_dd = dataArray_test_dd[(dataArray_test_dd['c_bar'] > 0.01) &(dataArray_test_dd['c_bar'] < 0.99)].sample(frac=1.0)
 
+        print('filtering for omega_DNS_filtered > 0.01 ...')
+        dataArray_train_dd = dataArray_train_dd[dataArray_train_dd['omega_DNS_filtered'] > 0.01]
+        dataArray_test_dd = dataArray_test_dd[dataArray_test_dd['omega_DNS_filtered'] > 0.01]
 
         if self.data_format == 'hdf':
             print('Writing output to hdf ...')
