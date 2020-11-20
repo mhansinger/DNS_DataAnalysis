@@ -3651,6 +3651,29 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         return data_train, data_test
 
+    def compute_S_R(self,gradient_tensor):
+        '''
+        Computes the symetric and anti symetric strain rate tensor
+        :param gradient_tensor:
+        :return: Strain, Anti
+        '''
+
+        print('Computing S and R')
+
+        length = gradient_tensor.shape[-1]
+
+        Strain = gradient_tensor.copy() * 0
+        Anti = gradient_tensor.copy() * 0
+
+        for i in range(0, length):
+            this_tensor = gradient_tensor[:, :, i]
+            this_transposed = np.transpose(gradient_tensor[:, :, i])
+
+            Strain[:, :, i] = 0.5 * (this_tensor + this_transposed)
+            Anti[:, :, i] = 0.5 * (this_tensor - this_transposed)
+
+        return Strain, Anti
+
 
     def run_analysis_DNN(self,filter_width ,filter_type, c_analytical=False):
         '''
@@ -3825,6 +3848,9 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
             output_train.append(this_train)
             output_test.append(this_test)
 
+        del output_list, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES, grad_U_x_LES, grad_U_y_LES, grad_U_z_LES
+        del grad_V_x_LES, grad_V_y_LES, grad_V_z_LES, grad_W_x_LES, grad_W_y_LES,grad_W_z_LES
+        print('Del output')
 
         #output_list = [self.crop_reshape_dataset(x) for x in output_list]
 
@@ -3839,7 +3865,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         dataArray_test_dd = dd.io.from_dask_array(dataArray_test_da, columns=output_names)
 
         # filter the data set and remove unecessary entries
-        print('filtering for c<0.99 & c>0.01 ...')
+        print('filtering for 0.01 < c < 0.99 ...')
         dataArray_train_dd = dataArray_train_dd[(dataArray_train_dd['c_bar'] > 0.01) &(dataArray_train_dd['c_bar'] < 0.99)].sample(frac=1.0)
         dataArray_test_dd = dataArray_test_dd[(dataArray_test_dd['c_bar'] > 0.01) &(dataArray_test_dd['c_bar'] < 0.99)].sample(frac=1.0)
 
@@ -3848,6 +3874,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
             print('Writing output to hdf ...')
             dataArray_df = dataArray_train_dd.compute()
             dataArray_df.to_hdf(filename + '_train.hdf',key='DNS',format='table')
+            del dataArray_df
             dataArray_df = dataArray_test_dd.compute()
             dataArray_df.to_hdf(filename + '_test.hdf', key='DNS', format='table')
 
@@ -3855,14 +3882,15 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
             print('Writing output to parquet ...')
             dataArray_df = dataArray_train_dd.compute()
             dataArray_df.to_parquet(filename + '_train.parquet')
+            del dataArray_df,
             dataArray_df = dataArray_test_dd.compute()
-            print(dataArray_df)
             dataArray_df.to_parquet(filename + '_test.parquet')
 
         elif self.data_format == 'csv':
             print('Writing output to csv ..')
             dataArray_df = dataArray_train_dd.compute()
             dataArray_df.to_csv(filename + '_train.csv')
+            del dataArray_df
             dataArray_df = dataArray_test_dd.compute()
             dataArray_df.to_csv(filename + '_test.csv')
 
