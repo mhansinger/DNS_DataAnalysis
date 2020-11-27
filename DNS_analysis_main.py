@@ -3738,29 +3738,6 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         print('Compute Scalar flux')
         self.compute_sgs_flux()
 
-        # ###########################
-        # compute the magnitude of gradients of the velocity field on the LES mesh
-        #self.compute_gradU_LES_4thO()
-        # use imported cython function: dtype needs to be float32!
-        # grad_U_x_LES, grad_V_x_LES, grad_W_x_LES, grad_U_y_LES, grad_V_y_LES, grad_W_y_LES, grad_U_z_LES, grad_V_z_LES, grad_W_z_LES = \
-        #                                                             compute_gradU_LES_4thO_tensor_cython(
-        #                                                             np.ascontiguousarray(self.U_bar, dtype=np.float32),
-        #                                                             np.ascontiguousarray(self.V_bar, dtype=np.float32),
-        #                                                             np.ascontiguousarray(self.W_bar, dtype=np.float32),
-        #                                                             self.Nx, self.Ny, self.Nz,
-        #                                                             np.float32(self.delta_x),int(self.filter_width))
-
-        # # #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
-        # grad_U_x_LES = np.asarray(grad_U_x_LES)
-        # grad_V_x_LES = np.asarray(grad_V_x_LES)
-        # grad_W_x_LES = np.asarray(grad_W_x_LES)
-        # grad_U_y_LES = np.asarray(grad_U_y_LES)
-        # grad_V_y_LES = np.asarray(grad_V_y_LES)
-        # grad_W_y_LES = np.asarray(grad_W_y_LES)
-        # grad_U_z_LES = np.asarray(grad_U_z_LES)
-        # grad_V_z_LES = np.asarray(grad_V_z_LES)
-        # grad_W_z_LES = np.asarray(grad_W_z_LES)
-
         # #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
         print('Computing x,y,z gradients of Velocity on LES mesh')
         grad_U_x_LES, grad_U_y_LES, grad_U_z_LES = np.gradient(self.U_bar,int(self.filter_width))
@@ -3815,7 +3792,13 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         del grad_V_x_LES, grad_V_y_LES, grad_V_z_LES, grad_W_x_LES, grad_W_y_LES,grad_W_z_LES, grad_U_x_LES, grad_U_y_LES, grad_U_z_LES
 
         # THESE ARE NOW ARRAYS in the FORM (3,3,self.Nx*self.Ny*self.Nz), no cubic shape
-        Strain, Anti = self.compute_S_R(gradient_tensor=gradient_tensor)
+        #Strain, Anti = self.compute_S_R(gradient_tensor=gradient_tensor)
+
+        print('Computing S and R')
+        # symetric strain
+        Strain = 0.5*(gradient_tensor + np.transpose(gradient_tensor,(1,0,2)))
+        #anti symetric strain
+        Anti =  0.5*(gradient_tensor - np.transpose(gradient_tensor,(1,0,2)))
 
         del gradient_tensor
 
@@ -3930,6 +3913,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
             output_train.append(this_train)
             output_test.append(this_test)
 
+        # delete some variables to free memory
         del output_list, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES,
 
         print('Del output')
@@ -3964,16 +3948,18 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
             dataArray_df.to_hdf(filename + '_test.hdf', key='DNS', format='table')
 
         elif self.data_format == 'parquet':
-            print('Writing output to parquet ...')
+            print('Computing output ...')
             dataArray_df = dataArray_train_dd.compute()
+            print('Writing output to parquet ...')
             dataArray_df.to_parquet(filename + '_train.parquet')
             del dataArray_df,
             dataArray_df = dataArray_test_dd.compute()
             dataArray_df.to_parquet(filename + '_test.parquet')
 
         elif self.data_format == 'csv':
-            print('Writing output to csv ..')
+            print('Computing output ..')
             dataArray_df = dataArray_train_dd.compute()
+            print('Writing output to csv ..')
             dataArray_df.to_csv(filename + '_train.csv')
             del dataArray_df
             dataArray_df = dataArray_test_dd.compute()
@@ -3981,4 +3967,286 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         print('Data has been written.\n\n')
 
+
+
+
+# Inherited class to write out a full slice
+class dns_analysis_writeSlices(dns_analysis_prepareDNN):
+    '''
+        This is to post process
+    '''
+
+    # TODO: Stimmt das so?
+    def __init__(self,case, data_format):
+        super(dns_analysis_writeSlices, self).__init__(case, data_format)
+        # extend super class with additional input parameters
+
+
+    def get_slice_vector(self,data,plane):
+        '''
+        split in train test data set consistently for all data sets!
+        Crop the boundaries from the cube: Nx-filter_width at each side. Reshape it to a vector
+        :param data:
+        :return:
+        '''
+
+        assert data.shape[0] == self.Nx
+
+        if plane=='x':
+
+            plane_2D = data[int(self.Nx/2),:,:].copy()
+
+            # reshape 2D slices to vector self.Nx * self.Nx
+            slice_vector = plane_2D.reshape(self.Ny * self.Nz, 1)
+
+        elif plane=='y':
+
+            plane_2D = data[:,int(self.Ny/2),:].copy()
+
+            # reshape 2D slices to vector self.Nx * self.Nx
+            slice_vector = plane_2D.reshape(self.Nx * self.Nz, 1)
+
+        elif plane=='z':
+
+            plane_2D = data[:,:,int(self.Nz/2)].copy()
+
+            # reshape 2D slices to vector self.Nx * self.Nx
+            slice_vector = plane_2D.reshape(self.Ny * self.Nz, 1)
+
+        return slice_vector
+
+
+
+
+    def run_analysis_DNN(self,filter_width ,filter_type, c_analytical=False):
+        '''
+        :param filter_width: DNS points to filter
+        :param filter_type: use 'TOPHAT' rather than 'GAUSSIAN
+        :param c_analytical: compute c minus analytically
+        :return:
+        '''
+        # run the analysis and compute the wrinkling factor -> real 3D cases
+        # interval is like nth point, skips some nodes
+        self.filter_type = filter_type
+
+        self.every_nth = 1
+
+        print('You are using %s filter!' % self.filter_type)
+
+        self.filter_width = int(filter_width)
+
+        self.c_analytical = c_analytical
+        if self.c_analytical is True:
+            print('You are using Hypergeometric function for c_minus (Eq.35)!')
+
+        #('Reading in U fieds ...')
+        self.read_UVW()
+
+        # filter the c and rho field
+        print('Filtering c field ')
+        #self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.rho_filtered = self.apply_filter(self.rho_data_np)
+
+        print('Filtering U components')
+        self.U_bar = self.apply_filter(self.U)
+        self.V_bar = self.apply_filter(self.V)
+        self.W_bar = self.apply_filter(self.W)
+
+        print('Computing x,y,z gradients of c_bar on LES mesh')
+        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = np.gradient(self.c_filtered,int(self.filter_width))
+
+        print('Compute UP_delta')
+        self.compute_UP_delta()
+
+        print('Compute Scalar flux')
+        self.compute_sgs_flux()
+
+        # #  CONVERT BACK TO NUMPY ARRAY FROM CYTHON
+        print('Computing x,y,z gradients of Velocity on LES mesh')
+        grad_U_x_LES, grad_U_y_LES, grad_U_z_LES = np.gradient(self.U_bar,int(self.filter_width))
+        grad_V_x_LES, grad_V_y_LES, grad_V_z_LES = np.gradient(self.V_bar,int(self.filter_width))
+        grad_W_x_LES, grad_W_y_LES, grad_W_z_LES = np.gradient(self.W_bar,int(self.filter_width))
+
+        ###########################
+        # Compute the scaled Delta (Pfitzner PDF)
+        self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
+        print('Delta_LES is: %.3f' % self.Delta_LES)
+        flame_thickness = self.compute_flamethickness()
+        print('Flame thickness: ',flame_thickness)
+
+        #maximum possible wrinkling factor
+        print('Maximum possible wrinkling factor: ', self.Delta_LES/flame_thickness)
+
+
+        ###########################
+        # compute omega based on pfitzner
+        self.compute_Pfitzner_model()
+
+        ##########################
+        # compute c_prime
+        self.compute_c_prime()
+
+        # # 2nd method to compute Xi
+        # Xi_iso_085, dirac_grad_xi_arr = self.compute_Xi_iso_dirac_xi(c_iso=0.85)
+
+        mag_U = np.sqrt(self.U_bar**2 + self.V_bar**2 + self.W_bar**2)
+        mag_grad_c = np.sqrt(grad_c_x_LES**2 + grad_c_y_LES**2 + grad_c_z_LES**2)
+
+        sum_U = np.absolute(self.U_bar) + np.absolute(self.V_bar)+np.absolute(self.W_bar)
+        sum_c = np.absolute(grad_c_x_LES) + np.absolute(grad_c_y_LES) +np.absolute(grad_c_z_LES)
+
+        grad_U = np.sqrt(grad_U_x_LES**2 + grad_U_y_LES**2 +grad_U_z_LES**2)
+        grad_V = np.sqrt(grad_V_x_LES**2 + grad_V_y_LES**2 +grad_V_z_LES**2)
+        grad_W = np.sqrt(grad_W_x_LES**2 + grad_W_y_LES**2 +grad_W_z_LES**2)
+
+        mag_grad_U = np.sqrt(grad_U**2 + grad_V**2 + grad_W**2)
+        sum_grad_U = np.absolute(grad_U) + np.absolute(grad_V) + np.absolute(grad_W)
+
+        del grad_U, grad_V, grad_W
+
+        print('Computing gradient_tensor')
+
+        gradient_tensor = np.array([
+                            [grad_U_x_LES.reshape(self.Nx*self.Ny*self.Nz),grad_V_x_LES.reshape(self.Nx*self.Ny*self.Nz),grad_W_x_LES.reshape(self.Nx*self.Ny*self.Nz)],
+                            [grad_U_y_LES.reshape(self.Nx*self.Ny*self.Nz),grad_V_y_LES.reshape(self.Nx*self.Ny*self.Nz),grad_W_y_LES.reshape(self.Nx*self.Ny*self.Nz)],
+                            [grad_U_z_LES.reshape(self.Nx*self.Ny*self.Nz),grad_V_z_LES.reshape(self.Nx*self.Ny*self.Nz),grad_W_z_LES.reshape(self.Nx*self.Ny*self.Nz)]
+                            ])
+
+        del grad_V_x_LES, grad_V_y_LES, grad_V_z_LES, grad_W_x_LES, grad_W_y_LES,grad_W_z_LES, grad_U_x_LES, grad_U_y_LES, grad_U_z_LES
+
+        # THESE ARE NOW ARRAYS in the FORM (3,3,self.Nx*self.Ny*self.Nz), no cubic shape
+        #Strain, Anti = self.compute_S_R(gradient_tensor=gradient_tensor)
+
+        print('Computing S and R')
+        # symetric strain
+        Strain = 0.5*(gradient_tensor + np.transpose(gradient_tensor,(1,0,2)))
+        #anti symetric strain
+        Anti =  0.5*(gradient_tensor - np.transpose(gradient_tensor,(1,0,2)))
+
+        del gradient_tensor
+
+        print('Computing lambdas')
+
+        lambda_1 = np.trace(Strain**2)
+        #lambda_2 = np.trace(Anti**2)
+        lambda_3 = np.trace(Strain**3)
+        #lambda_4 = np.trace(Anti**2 * Strain)
+        #lambda_5 = np.trace(Anti**2 * Strain**2)
+
+        # convert to 3D
+        lambda_1 = lambda_1.reshape(self.Nx,self.Ny, self.Nz)
+        lambda_3 = lambda_3.reshape(self.Nx,self.Ny, self.Nz)
+
+        # features of Junsu
+        omega_x = Anti[1, 2,:] - Anti[2, 1,:]
+        omega_y = Anti[0, 2,:] - Anti[2, 0,:]
+        omega_z = Anti[0, 1,:] - Anti[1, 0,:]
+
+        # Magnitude of vorticity and strain
+        mag_vor = np.sqrt(omega_x * omega_x + omega_y * omega_y + omega_z * omega_z)
+        mag_strain = np.sqrt(Strain[0, 0, :] * Strain[0, 0, :] + Strain[1, 1, :] * Strain[1, 1, :] + Strain[2, 2, :] * Strain[2, 2, :])
+
+        # convert to 3D
+        mag_vor = mag_vor.reshape(self.Nx,self.Ny,self.Nz)
+        mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
+
+        # Delete some variables to freememory
+        del omega_x, omega_y, omega_z, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES,
+
+        # #creat dask array and reshape all data
+        output_list =[self.c_filtered,
+                                    self.omega_DNS_filtered,
+                                    self.omega_model_cbar,
+                                    mag_U,
+                                    mag_grad_U,
+                                    mag_grad_c,
+                                    mag_strain,
+                                    mag_vor,
+                                    lambda_1,
+                                    lambda_3,
+                                    sum_U,
+                                    sum_c,
+                                    sum_grad_U,
+                                    self.UP_delta,
+                                    self.SGS_scalar_flux,
+                                    self.c_prime,
+                                    # add the filter width as information and perturb it slightly
+                                    np.ones((self.Nx,self.Ny,self.Nz))*self.Delta_LES +
+                                        (np.random.rand(self.Nx,self.Ny,self.Nz)*1e-6),
+                                    np.ones((self.Nx, self.Ny, self.Nz)) * self.filter_width
+                                  ]
+
+        output_names =['c_bar',
+                         # 'mag_grad_c_bar',
+                         'omega_DNS_filtered',
+                         'omega_model_planar',
+                        'mag_U',
+                        'mag_grad_U',
+                        'mag_grad_c',
+                        'mag_strain',
+                        'mag_vorticity',   # magnitude vorticity
+                        'lambda_1',
+                        'lambda_3',
+                        'sum_U',
+                        'sum_c',
+                        'sum_grad_U',
+                        'UP_delta',
+                         'SGS_flux',
+                         'c_prime',
+                         'Delta_LES',
+                          'filter_width'
+                         ]
+
+
+        # compute output for SLICE in PLANE X
+
+        planes = ['x','y','z']
+
+        for p in planes:
+
+            output = []
+
+            for x in output_list:
+
+                this_slice_vector = self.get_slice_vector(x,plane=p)
+
+                output.append(this_slice_vector)
+
+
+            #output_list = [self.crop_reshape_dataset(x) for x in output_list]
+
+            dataArray_da = da.hstack(output)
+
+            case_name = self.case.split('/')[1]
+
+            filename = join(self.case, 'postProcess_DNN/slice_plane_'+p+'_'+ str(self.filter_width) + '_DNN_'+case_name)
+
+            dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=output_names)
+
+            # Save the data vector depending on file format
+            if self.data_format == 'hdf':
+                print('Writing output to hdf ...')
+                dataArray_df = dataArray_dd.compute()
+                dataArray_df.to_hdf(filename + '.hdf',key='DNS',format='table')
+                del dataArray_df
+
+
+            elif self.data_format == 'parquet':
+                print('Computing output ...')
+                dataArray_df = dataArray_dd.compute()
+                print('Writing output to parquet ...')
+                dataArray_df.to_parquet(filename + '.parquet')
+                del dataArray_df,
+
+
+            elif self.data_format == 'csv':
+                print('Computing output ..')
+                dataArray_df = dataArray_dd.compute()
+                print('Writing output to csv ..')
+                dataArray_df.to_csv(filename + '.csv')
+                del dataArray_df
+
+
+            print('Data has been written for plane %s.\n\n' % p)
 
