@@ -143,9 +143,11 @@ class dns_analysis_base(object):
         self.p_0 = 1
 
         # Variables for FILTERING
-        self.c_filtered = np.zeros((self.Nx,self.Ny,self.Nz))
+        # Reynolds filtered progress variable
+        self.c_bar = np.zeros((self.Nx,self.Ny,self.Nz))
+
         #self.rho_filtered = np.zeros((self.Nx,self.Ny,self.Nz))
-        #self.c_filtered_clipped = np.zeros((self.Nx,self.Ny,self.Nz))       # c für wrinkling factor nur zw 0.75 und 0.85
+        #self.c_bar_clipped = np.zeros((self.Nx,self.Ny,self.Nz))       # c für wrinkling factor nur zw 0.75 und 0.85
 
         # SCHMIDT NUMBER
         self.Sc = 0.7
@@ -385,9 +387,9 @@ class dns_analysis_base(object):
         for l in range(2,self.Nx-2):
             for m in range(2,self.Ny-2):
                 for n in range(2,self.Nz-2):
-                    this_LES_gradX = (self.c_filtered[l + 1, m, n] - self.c_filtered[l - 1, m, n]) / (2 * self.delta_x)
-                    this_LES_gradY = (self.c_filtered[l, m + 1, n] - self.c_filtered[l, m - 1, n]) / (2 * self.delta_x)
-                    this_LES_gradZ = (self.c_filtered[l, m, n + 1] - self.c_filtered[l, m, n - 1]) / (2 * self.delta_x)
+                    this_LES_gradX = (self.c_bar[l + 1, m, n] - self.c_bar[l - 1, m, n]) / (2 * self.delta_x)
+                    this_LES_gradY = (self.c_bar[l, m + 1, n] - self.c_bar[l, m - 1, n]) / (2 * self.delta_x)
+                    this_LES_gradZ = (self.c_bar[l, m, n + 1] - self.c_bar[l, m, n - 1]) / (2 * self.delta_x)
                     # compute the magnitude of the gradient
                     this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
 
@@ -411,9 +413,9 @@ class dns_analysis_base(object):
         for l in range(2, self.Nx - 2):
             for m in range(2, self.Ny - 2):
                 for n in range(2, self.Nz - 2):
-                    this_LES_gradX = (-self.c_filtered[l + 2, m, n] + 8*self.c_filtered[l + 1, m, n] - 8*self.c_filtered[l - 1, m, n] + self.c_filtered[l - 2, m, n]) / (12 * self.delta_x)
-                    this_LES_gradY = (-self.c_filtered[l, m + 2, n] + 8*self.c_filtered[l, m+1, n] - 8*self.c_filtered[l, m-1, n] + self.c_filtered[l, m-2, n]) / (12 * self.delta_x)
-                    this_LES_gradZ = (-self.c_filtered[l, m, n+2] + 8*self.c_filtered[l, m, n+1] - 8*self.c_filtered[l, m, n-1] + self.c_filtered[l, m, n-2]) / (12 * self.delta_x)
+                    this_LES_gradX = (-self.c_bar[l + 2, m, n] + 8*self.c_bar[l + 1, m, n] - 8*self.c_bar[l - 1, m, n] + self.c_bar[l - 2, m, n]) / (12 * self.delta_x)
+                    this_LES_gradY = (-self.c_bar[l, m + 2, n] + 8*self.c_bar[l, m+1, n] - 8*self.c_bar[l, m-1, n] + self.c_bar[l, m-2, n]) / (12 * self.delta_x)
+                    this_LES_gradZ = (-self.c_bar[l, m, n+2] + 8*self.c_bar[l, m, n+1] - 8*self.c_bar[l, m, n-1] + self.c_bar[l, m, n-2]) / (12 * self.delta_x)
                     # compute the magnitude of the gradient
                     this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
 
@@ -434,9 +436,9 @@ class dns_analysis_base(object):
         # for l in range(1, self.Nx - 1):
         #     for m in range(1, self.Nx - 1):
         #         for n in range(1, self.Nx - 1):
-        #             this_LES_gradX = (self.c_filtered_reduced[l + 1, m, n] - self.c_filtered_reduced[l - 1, m, n]) / (2 * self.delta_x)
-        #             this_LES_gradY = (self.c_filtered_reduced[l, m + 1, n] - self.c_filtered_reduced[l, m - 1, n]) / (2 * self.delta_x)
-        #             this_LES_gradZ = (self.c_filtered_reduced[l, m, n + 1] - self.c_filtered_reduced[l, m, n - 1]) / (2 * self.delta_x)
+        #             this_LES_gradX = (self.c_bar_reduced[l + 1, m, n] - self.c_bar_reduced[l - 1, m, n]) / (2 * self.delta_x)
+        #             this_LES_gradY = (self.c_bar_reduced[l, m + 1, n] - self.c_bar_reduced[l, m - 1, n]) / (2 * self.delta_x)
+        #             this_LES_gradZ = (self.c_bar_reduced[l, m, n + 1] - self.c_bar_reduced[l, m, n - 1]) / (2 * self.delta_x)
         #             # compute the magnitude of the gradient
         #             this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
         #
@@ -462,9 +464,9 @@ class dns_analysis_base(object):
         for l in range(self.filter_width, self.Nx - self.filter_width):
             for m in range(self.filter_width, self.Ny - self.filter_width):
                 for n in range(self.filter_width, self.Nz - self.filter_width):
-                    this_LES_gradX = (self.c_filtered[l + self.filter_width, m, n] - self.c_filtered[l - self.filter_width, m, n]) / (2 * self.delta_x * self.filter_width)
-                    this_LES_gradY = (self.c_filtered[l, m + self.filter_width, n] - self.c_filtered[l, m - self.filter_width, n]) / (2 * self.delta_x * self.filter_width)
-                    this_LES_gradZ = (self.c_filtered[l, m, n + self.filter_width] - self.c_filtered[l, m, n - self.filter_width]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradX = (self.c_bar[l + self.filter_width, m, n] - self.c_bar[l - self.filter_width, m, n]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradY = (self.c_bar[l, m + self.filter_width, n] - self.c_bar[l, m - self.filter_width, n]) / (2 * self.delta_x * self.filter_width)
+                    this_LES_gradZ = (self.c_bar[l, m, n + self.filter_width] - self.c_bar[l, m, n - self.filter_width]) / (2 * self.delta_x * self.filter_width)
                     # compute the magnitude of the gradient
                     this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
 
@@ -485,9 +487,9 @@ class dns_analysis_base(object):
         # for l in range(self.filter_width, self.Nx - self.filter_width):
         #     for m in range(self.filter_width, self.Nx - self.filter_width):
         #         for n in range(self.filter_width, self.Nx - self.filter_width):
-        #             this_LES_gradX = (self.c_filtered_reduced[l + self.filter_width, m, n] - self.c_filtered_reduced[l - self.filter_width, m, n]) / (2 * self.delta_x * self.filter_width)
-        #             this_LES_gradY = (self.c_filtered_reduced[l, m + self.filter_width, n] - self.c_filtered_reduced[l, m - self.filter_width, n]) / (2 * self.delta_x * self.filter_width)
-        #             this_LES_gradZ = (self.c_filtered_reduced[l, m, n + self.filter_width] - self.c_filtered_reduced[l, m, n - self.filter_width]) / (2 * self.delta_x * self.filter_width)
+        #             this_LES_gradX = (self.c_bar_reduced[l + self.filter_width, m, n] - self.c_bar_reduced[l - self.filter_width, m, n]) / (2 * self.delta_x * self.filter_width)
+        #             this_LES_gradY = (self.c_bar_reduced[l, m + self.filter_width, n] - self.c_bar_reduced[l, m - self.filter_width, n]) / (2 * self.delta_x * self.filter_width)
+        #             this_LES_gradZ = (self.c_bar_reduced[l, m, n + self.filter_width] - self.c_bar_reduced[l, m, n - self.filter_width]) / (2 * self.delta_x * self.filter_width)
         #             # compute the magnitude of the gradient
         #             this_LES_magGrad_c = np.sqrt(this_LES_gradX ** 2 + this_LES_gradY ** 2 + this_LES_gradZ ** 2)
         #
@@ -725,7 +727,7 @@ class dns_analysis_base(object):
         Lambda = 18.97
 
         # according to Pfitzner implementation
-        exponent = - self.beta*(1-self.c_filtered.reshape(self.Nx*self.Ny*self.Nz)) / (1 - self.alpha*(1 - self.c_filtered.reshape(self.Nx*self.Ny*self.Nz)))
+        exponent = - self.beta*(1-self.c_bar.reshape(self.Nx*self.Ny*self.Nz)) / (1 - self.alpha*(1 - self.c_bar.reshape(self.Nx*self.Ny*self.Nz)))
         #this_RR_reshape_DNS = self.bfact*self.rho_data_np.reshape(self.Nx*self.Ny*self.Nz)*(1-self.c_data_np.reshape(self.Nx*self.Ny*self.Nz))*np.exp(exponent)
 
         this_RR_reshape_LES_Pfitz  = Lambda * ((1 - self.alpha * (1 - self.c_data_np.reshape(self.Nx*self.Ny*self.Nz)))) ** (-1) \
@@ -796,11 +798,11 @@ class dns_analysis_base(object):
         :return: nothing
         '''
 
-        # self.c_filtered.reshape(self.Nx*self.Ny*self.Nz) = c_bar in der ganzen domain als vector
-        this_s = self.compute_s(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz))
+        # self.c_bar.reshape(self.Nx*self.Ny*self.Nz) = c_bar in der ganzen domain als vector
+        this_s = self.compute_s(self.c_bar.reshape(self.Nx*self.Ny*self.Nz))
         this_delta_0 = self.compute_delta_0(this_s)
 
-        self.c_minus = (np.exp(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz)* this_delta_0 * self.Delta_LES) - 1) / \
+        self.c_minus = (np.exp(self.c_bar.reshape(self.Nx*self.Ny*self.Nz)* this_delta_0 * self.Delta_LES) - 1) / \
                        (np.exp(this_delta_0 * self.Delta_LES) - 1)
 
 
@@ -830,8 +832,8 @@ class dns_analysis_base(object):
         f_c_plus = interpolate.interp1d(c_bar_dummy, c_plus_dummy, fill_value="extrapolate")
 
         # update c_minus and c_plus
-        self.c_minus = f_c_minus(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz))
-        self.c_plus = f_c_plus(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz))
+        self.c_minus = f_c_minus(self.c_bar.reshape(self.Nx*self.Ny*self.Nz))
+        self.c_plus = f_c_plus(self.c_bar.reshape(self.Nx*self.Ny*self.Nz))
 
 
     def I_1(self,c):
@@ -920,7 +922,7 @@ class dns_analysis_base(object):
 
         self.omega_model_cbar = self.compute_model_omega_bar()
 
-        #self.omega_model_cbar = self.model_omega(self.c_filtered.reshape(self.Nx*self.Ny*self.Nz))
+        #self.omega_model_cbar = self.model_omega(self.c_bar.reshape(self.Nx*self.Ny*self.Nz))
         self.omega_DNS = self.analytical_omega(self.c_data_np.reshape(self.Nx*self.Ny*self.Nz))
 
         if len(self.omega_DNS.shape) == 1:
@@ -965,7 +967,7 @@ class dns_analysis_wrinkling(dns_analysis_base):
         # filter the c and rho field
         print('Filtering c field ...')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x * self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -1009,7 +1011,7 @@ class dns_analysis_wrinkling(dns_analysis_base):
                                 self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
                                 om_iso.reshape(self.Nx*self.Ny*self.Nz,1),
                                 om_wrinkl.reshape(self.Nx*self.Ny*self.Nz,1),
-                                self.c_filtered.reshape(self.Nx*self.Ny*self.Nz, 1)]),
+                                self.c_bar.reshape(self.Nx*self.Ny*self.Nz, 1)]),
                                 columns=['omega_DNS',
                                         'omega_filtered',
                                         'omega_model_by_isoArea',
@@ -1017,7 +1019,7 @@ class dns_analysis_wrinkling(dns_analysis_base):
                                         'c_bar']).to_csv(filename)
 
         # creat dask array and reshape all data
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
                                    self.wrinkling_factor.reshape(self.Nx*self.Ny*self.Nz,1),
                                    isoArea_coefficient.reshape(self.Nx*self.Ny*self.Nz,1),
                                    self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
@@ -1099,7 +1101,7 @@ class dns_analysis_cluster(dns_analysis_base):
         # filter the c and rho field
         print('Filtering c field ...')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -1142,7 +1144,7 @@ class dns_analysis_cluster(dns_analysis_base):
                                self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
                                om_iso.reshape(self.Nx*self.Ny*self.Nz,1),
                                om_wrinkl.reshape(self.Nx*self.Ny*self.Nz,1),
-                               self.c_filtered.reshape(self.Nx*self.Ny*self.Nz, 1)]),
+                               self.c_bar.reshape(self.Nx*self.Ny*self.Nz, 1)]),
                                columns=['omega_DNS',
                                         'omega_filtered',
                                         'omega_model_by_isoArea',
@@ -1151,7 +1153,7 @@ class dns_analysis_cluster(dns_analysis_base):
 
 
         # creat dask array and reshape all data
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
                                    self.wrinkling_factor.reshape(self.Nx*self.Ny*self.Nz,1),
                                    isoArea_coefficient.reshape(self.Nx*self.Ny*self.Nz,1),
                                    # self.wrinkling_factor_LES.reshape(self.Nx*self.Ny*self.Nz, 1),
@@ -1365,7 +1367,7 @@ class dns_analysis_dirac(dns_analysis_base):
         # filter the c and rho field
         print('Filtering c field ...')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -1395,7 +1397,7 @@ class dns_analysis_dirac(dns_analysis_base):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
@@ -1570,7 +1572,7 @@ class dns_analysis_dirac_xi(dns_analysis_dirac):
         # filter the c and rho field
         print('Filtering c field ...')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -1598,7 +1600,7 @@ class dns_analysis_dirac_xi(dns_analysis_dirac):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
@@ -1850,7 +1852,7 @@ class dns_analysis_dirac_FSD(dns_analysis_dirac_xi):
         # filter the c and rho field
         print('Filtering c field ...')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -1869,7 +1871,7 @@ class dns_analysis_dirac_FSD(dns_analysis_dirac_xi):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.omega_model_exact.reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1)
                                   ])
@@ -2100,7 +2102,7 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
         # filter the c and rho field
         print('Filtering c field ...')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -2119,7 +2121,7 @@ class dns_analysis_dirac_FSD_alt(dns_analysis_dirac_xi):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.omega_model_exact.reshape(self.Nx*self.Ny*self.Nz,1),
                                     self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1)
                                   ])
@@ -2180,7 +2182,7 @@ class dns_analysis_dirac_compare(dns_analysis_dirac_FSD_alt):
         # filter the c and rho field
         print('Filtering c field ...')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -2202,13 +2204,13 @@ class dns_analysis_dirac_compare(dns_analysis_dirac_FSD_alt):
         Xi_iso_085 = self.compute_Xi_iso_dirac_c(c_iso=0.85)
 
         # 3rd method
-        Xi_iso_cbar = self.compute_Xi_iso_dirac_c(c_iso=self.c_filtered)
+        Xi_iso_cbar = self.compute_Xi_iso_dirac_c(c_iso=self.c_bar)
 
         # 4th method: computes wrinkling factor
         self.get_wrinkling(order='4th')
 
         # prepare data for output to csv file
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
                                   self.omega_model_exact.reshape(self.Nx*self.Ny*self.Nz,1),
                                   self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
                                   self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
@@ -2299,7 +2301,7 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
     #     # filter the c and rho field
     #     print('Filtering c field ...')
     #     #self.rho_filtered = self.apply_filter(self.rho_data_np)
-    #     self.c_filtered = self.apply_filter(self.c_data_np)
+    #     self.c_bar = self.apply_filter(self.c_data_np)
     #
     #     # Compute the scaled Delta (Pfitzner PDF)
     #     self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -2321,13 +2323,13 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
     #     Xi_iso_085 = self.compute_Xi_iso_dirac_c(c_iso=0.85)
     #
     #     # # 3rd method
-    #     # Xi_iso_cbar = self.compute_Xi_iso_dirac_c(c_iso=self.c_filtered)
+    #     # Xi_iso_cbar = self.compute_Xi_iso_dirac_c(c_iso=self.c_bar)
     #     #
     #     # # 4th method: computes wrinkling factor
     #     # self.get_wrinkling(order='4th')
     #
     #     # prepare data for output to csv file
-    #     dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+    #     dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
     #                               #self.omega_model_exact.reshape(self.Nx*self.Ny*self.Nz,1),
     #                               self.omega_DNS_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
     #                               self.omega_model_cbar.reshape(self.Nx*self.Ny*self.Nz,1),
@@ -2381,7 +2383,7 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
         # filter the c and rho field
         print('Filtering c field ...')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         # Compute the scaled Delta (Pfitzner PDF)
         self.Delta_LES = self.delta_x*self.filter_width * self.Sc * self.Re * np.sqrt(self.p/self.p_0)
@@ -2415,7 +2417,7 @@ class dns_analysis_compare_40slices(dns_analysis_dirac_FSD_alt):
 
         # creat dask array and reshape all data
         # a bit nasty for list in list as of variable c_iso values
-        dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx*self.Ny*self.Nz,1),
+        dataArray_da = da.hstack([self.c_bar.reshape(self.Nx*self.Ny*self.Nz,1),
                                   self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
                                   self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
                                   #self.Xi_iso_filtered[:,:,:,0].reshape(self.Nx*self.Ny*self.Nz,1),
@@ -2668,7 +2670,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         # filter the c and rho field
         print('Filtering c field ')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
 
         #Todo: In paralllel? How?
         print('Filtering U components')
@@ -2740,7 +2742,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
         # compute abs(grad(xi)) on the whole DNS domain
         # CYTHON
         print('Computing gradients of c_bar on DNS mesh 4th Order with Cython')
-        grad_c_bar_DNS = compute_DNS_grad_4thO_cython(np.ascontiguousarray(self.c_filtered, dtype=np.float32),
+        grad_c_bar_DNS = compute_DNS_grad_4thO_cython(np.ascontiguousarray(self.c_bar, dtype=np.float32),
                                                       self.Nx, self.Ny, self.Nz, np.float32(self.delta_x))
 
         grad_c_bar_DNS = np.asarray(grad_c_bar_DNS)
@@ -2756,7 +2758,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
 
         # #creat dask array and reshape all data
 
-        self.dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
+        self.dataArray_da = da.hstack([self.c_bar.reshape(self.Nx * self.Ny * self.Nz,1),
                                   grad_c_bar_DNS.reshape(self.Nx * self.Ny * self.Nz, 1),
                                   self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
                                   self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
@@ -2773,7 +2775,7 @@ class dns_analysis_UVW(dns_analysis_dirac_FSD_alt):
                                   ])
 
 
-        # self.dataArray_da = da.hstack([self.c_filtered[200:300,200:300,200:300].reshape(100**3,1),
+        # self.dataArray_da = da.hstack([self.c_bar[200:300,200:300,200:300].reshape(100**3,1),
         #                           grad_c_bar_DNS[200:300,200:300,200:300].reshape(100**3, 1),
         #                           self.omega_DNS_filtered[200:300,200:300,200:300].reshape(100**3, 1),
         #                           self.omega_model_cbar[200:300,200:300,200:300].reshape(100**3, 1),
@@ -2859,9 +2861,9 @@ class dns_analysis_tensors(dns_analysis_UVW):
         V_c_bar = self.apply_filter(self.c_data_np * self.V)
         W_c_bar = self.apply_filter(self.c_data_np * self.W)
 
-        TAU_11 = U_c_bar - self.c_filtered * self.U_bar
-        TAU_22 = V_c_bar - self.c_filtered * self.V_bar
-        TAU_33 = W_c_bar - self.c_filtered * self.W_bar
+        TAU_11 = U_c_bar - self.c_bar * self.U_bar
+        TAU_22 = V_c_bar - self.c_bar * self.V_bar
+        TAU_33 = W_c_bar - self.c_bar * self.W_bar
 
         self.SGS_scalar_flux = np.sqrt(TAU_11 **2 + TAU_22 ** 2 + TAU_33**2)
 
@@ -2918,7 +2920,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
         # filter the c and rho field
         print('Filtering c, rho*c, rho fields ')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
         self.rho_c_filtered = self.apply_filter(self.rho_c_data_np)
         self.rho_filtered = self.apply_filter(self.rho_data_np)
 
@@ -3023,7 +3025,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
         # compute abs(grad(xi)) on the whole DNS domain
         # CYTHON
         print('Computing x,y,z gradients of c_bar on DNS mesh 4th Order with Cython')
-        grad_c_x_DNS, grad_c_y_DNS, grad_c_z_DNS = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_filtered, dtype=np.float32),
+        grad_c_x_DNS, grad_c_y_DNS, grad_c_z_DNS = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_bar, dtype=np.float32),
                                                       self.Nx, self.Ny, self.Nz, np.float32(self.delta_x), int(1))
 
         grad_c_x_DNS = np.asarray(grad_c_x_DNS)
@@ -3032,7 +3034,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
 
 
         print('Computing x,y,z gradients of c_bar on LES mesh 4th Order with Cython')
-        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_filtered, dtype=np.float32),
+        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_bar, dtype=np.float32),
                                                       self.Nx, self.Ny, self.Nz, np.float32(self.delta_x), int(self.filter_width))
 
         grad_c_x_LES = np.asarray(grad_c_x_LES)
@@ -3050,7 +3052,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
 
         # #creat dask array and reshape all data
 
-        self.dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
+        self.dataArray_da = da.hstack([self.c_bar.reshape(self.Nx * self.Ny * self.Nz,1),
 
                                           self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
                                           self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
@@ -3065,7 +3067,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
                                   ])
 
         self.dataArray_LES_grads_da = da.hstack([
-                                        #self.c_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
+                                        #self.c_bar.reshape(self.Nx * self.Ny * self.Nz, 1),
                                        grad_c_x_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
                                        grad_c_y_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
                                        grad_c_z_LES.reshape(self.Nx * self.Ny * self.Nz, 1),
@@ -3291,7 +3293,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
         # filter the c and rho field
         print('Filtering c, rho*c, rho fields ')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
         self.rho_c_filtered = self.apply_filter(self.rho_c_data_np)
         self.rho_filtered = self.apply_filter(self.rho_data_np)
 
@@ -3381,7 +3383,7 @@ class dns_analysis_tensors(dns_analysis_UVW):
 
         # #creat dask array and reshape all data
 
-        self.dataArray_da = da.hstack([self.c_filtered.reshape(self.Nx * self.Ny * self.Nz,1),
+        self.dataArray_da = da.hstack([self.c_bar.reshape(self.Nx * self.Ny * self.Nz,1),
                                           self.c_tilde.reshape(self.Nx * self.Ny * self.Nz,1),
                                           self.omega_DNS_filtered.reshape(self.Nx * self.Ny * self.Nz, 1),
                                           self.omega_model_cbar.reshape(self.Nx * self.Ny * self.Nz, 1),
@@ -3473,6 +3475,9 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         self.V_prime = None
         self.W_prime = None
 
+        # Density filtered
+        self.rho_filtered = None
+
         # create empty array
         self.grad_U_bar = np.zeros([self.Nx, self.Ny, self.Nz])
         self.grad_V_bar = np.zeros([self.Nx, self.Ny, self.Nz])
@@ -3526,6 +3531,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         self.c_prime = scipy.ndimage.generic_filter(self.c_data_np, np.var, mode='wrap',
                                                     size=(self.filter_width, self.filter_width,self.filter_width))
 
+
     def compute_sgs_flux(self):
         '''
         Computes the SGS scalar flux: research_progress_shin_8.pdf: slide 6
@@ -3537,9 +3543,9 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         V_c_bar = self.apply_filter(self.c_data_np * self.V)
         W_c_bar = self.apply_filter(self.c_data_np * self.W)
 
-        TAU_11 = U_c_bar - self.c_filtered * self.U_bar
-        TAU_22 = V_c_bar - self.c_filtered * self.V_bar
-        TAU_33 = W_c_bar - self.c_filtered * self.W_bar
+        TAU_11 = U_c_bar - self.c_bar * self.U_bar
+        TAU_22 = V_c_bar - self.c_bar * self.V_bar
+        TAU_33 = W_c_bar - self.c_bar * self.W_bar
 
         self.SGS_scalar_flux = np.sqrt(TAU_11 **2 + TAU_22 ** 2 + TAU_33**2)
 
@@ -3710,8 +3716,12 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         # filter the c and rho field
         print('Filtering c field ')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
         self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.rho_c_filtered = self.apply_filter(self.rho_c_data_np)
+
+        print('Computing c_tilde')
+        self.c_tilde = self.rho_c_filtered/ self.rho_filtered
 
         #Todo: In paralllel? How?
         print('Filtering U components')
@@ -3722,7 +3732,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         #############################
         # Compute gradients of c_bar with Cython
         # print('Computing x,y,z gradients of c_bar on LES mesh 4th Order with Cython')
-        # grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_filtered, dtype=np.float32),
+        # grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = compute_LES_grad_4thO_tensor_cython(np.ascontiguousarray(self.c_bar, dtype=np.float32),
         #                                               self.Nx, self.Ny, self.Nz, np.float32(self.delta_x), int(self.filter_width))
 
         # grad_c_x_LES = np.asarray(grad_c_x_LES)
@@ -3730,7 +3740,10 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         # grad_c_z_LES = np.asarray(grad_c_z_LES)
 
         print('Computing x,y,z gradients of c_bar on LES mesh')
-        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = np.gradient(self.c_filtered,int(self.filter_width))
+        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = np.gradient(self.c_bar,int(self.filter_width))
+
+        print('Computing x,y,z gradients of c_tilde on LES mesh')
+        grad_c_tilde_x_LES, grad_c_tilde_y_LES, grad_c_tilde_z_LES = np.gradient(self.c_tilde,int(self.filter_width))
 
         print('Compute UP_delta')
         self.compute_UP_delta()
@@ -3769,15 +3782,17 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         mag_U = np.sqrt(self.U_bar**2 + self.V_bar**2 +self.W_bar**2)
         mag_grad_c = np.sqrt(grad_c_x_LES**2 + grad_c_y_LES**2 + grad_c_z_LES**2)
 
-        sum_U = np.absolute(self.U_bar) + np.absolute(self.V_bar)+np.absolute(self.W_bar)
-        sum_c = np.absolute(grad_c_x_LES) + np.absolute(grad_c_y_LES) +np.absolute(grad_c_z_LES)
+        mag_grad_c_tilde = np.sqrt(grad_c_tilde_x_LES**2 + grad_c_tilde_y_LES**2 + grad_c_tilde_z_LES**2)
+
+        # sum_U = np.absolute(self.U_bar) + np.absolute(self.V_bar)+np.absolute(self.W_bar)
+        # sum_c = np.absolute(grad_c_x_LES) + np.absolute(grad_c_y_LES) +np.absolute(grad_c_z_LES)
 
         grad_U = np.sqrt(grad_U_x_LES**2 + grad_U_y_LES**2 +grad_U_z_LES**2)
         grad_V = np.sqrt(grad_V_x_LES**2 + grad_V_y_LES**2 +grad_V_z_LES**2)
         grad_W = np.sqrt(grad_W_x_LES**2 + grad_W_y_LES**2 +grad_W_z_LES**2)
 
         mag_grad_U = np.sqrt(grad_U**2 + grad_V**2 + grad_W**2)
-        sum_grad_U = np.absolute(grad_U) + np.absolute(grad_V) + np.absolute(grad_W)
+        # sum_grad_U = np.absolute(grad_U) + np.absolute(grad_V) + np.absolute(grad_W)
 
         del grad_U, grad_V, grad_W
 
@@ -3814,50 +3829,35 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         lambda_1 = lambda_1.reshape(self.Nx,self.Ny, self.Nz)
         lambda_3 = lambda_3.reshape(self.Nx,self.Ny, self.Nz)
 
-        # features of Junsu
-        omega_x = Anti[1, 2,:] - Anti[2, 1,:]
-        omega_y = Anti[0, 2,:] - Anti[2, 0,:]
-        omega_z = Anti[0, 1,:] - Anti[1, 0,:]
+        # # features of Junsu
+        # omega_x = Anti[1, 2,:] - Anti[2, 1,:]
+        # omega_y = Anti[0, 2,:] - Anti[2, 0,:]
+        # omega_z = Anti[0, 1,:] - Anti[1, 0,:]
 
-        # Magnitude of vorticity and strain
-        mag_vor = np.sqrt(omega_x * omega_x + omega_y * omega_y + omega_z * omega_z)
-        mag_strain = np.sqrt(Strain[0, 0,:] * Strain[0, 0,:] + Strain[1, 1,:] * Strain[1, 1,:] + Strain[2, 2,:] * Strain[2, 2,:])
+        # # Magnitude of vorticity and strain
+        # mag_vor = np.sqrt(omega_x * omega_x + omega_y * omega_y + omega_z * omega_z)
+        # mag_strain = np.sqrt(Strain[0, 0,:] * Strain[0, 0,:] + Strain[1, 1,:] * Strain[1, 1,:] + Strain[2, 2,:] * Strain[2, 2,:])
 
-        # convert to 3D
-        mag_vor = mag_vor.reshape(self.Nx,self.Ny,self.Nz)
-        mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
+        # # convert to 3D
+        # mag_vor = mag_vor.reshape(self.Nx,self.Ny,self.Nz)
+        # mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
 
         del omega_x, omega_y, omega_z
 
         # #creat dask array and reshape all data
-        output_list =[self.c_filtered,
+        output_list =[           self.c_bar,
+                                 self.c_tilde,
                                   self.omega_DNS_filtered,
                                   self.omega_model_cbar,
-                                  mag_U,
+                                 # self.rho_filtered/self.rho_filtered.max(),
+                                 # mag_U,
                                   mag_grad_U,
                                   mag_grad_c,
-                                  mag_strain,
-                                  mag_vor,
+                                  mag_grad_c_tilde,
+                                  #mag_strain,
+                                  #mag_vor,
                                   lambda_1,
                                   lambda_3,
-                                  sum_U,
-                                  sum_c,
-                                    sum_grad_U,
-                                  # self.U_bar,
-                                  # self.V_bar,
-                                  # self.W_bar,
-                                  # grad_c_x_LES,
-                                  # grad_c_y_LES,
-                                  # grad_c_z_LES,
-                                  #   grad_U_x_LES,
-                                  #   grad_V_x_LES,
-                                  #   grad_W_x_LES,
-                                  #   grad_U_y_LES,
-                                  #   grad_V_y_LES,
-                                  #   grad_W_y_LES,
-                                  #   grad_U_z_LES,
-                                  #   grad_V_z_LES,
-                                  #   grad_W_z_LES,
                                     self.UP_delta,
                                     self.SGS_scalar_flux,
                                     self.c_prime,
@@ -3868,39 +3868,23 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                                   ]
 
         output_names =['c_bar',
-                         # 'mag_grad_c_bar',
+                         'c_tilde',
                          'omega_DNS_filtered',
                          'omega_model_planar',
-                       'mag_U',
+                       #'rho_ratio',
+                       #'mag_U',
                        'mag_grad_U',
                        'mag_grad_c',
-                       'mag_strain',
-                       'mag_vorticity',   # magnitude vorticity
+                       'mag_grad_c_tilde',
+                       # 'mag_strain',
+                       # 'mag_vorticity',   # magnitude vorticity
                        'lambda_1',
                        'lambda_3',
-                       'sum_U',
-                       'sum_c',
-                       'sum_grad_U',
-                         # 'U_bar',
-                         # 'V_bar',
-                         # 'W_bar',
-                         # 'grad_c_x_LES',
-                         # 'grad_c_y_LES',
-                         # 'grad_c_z_LES',
-                         # 'grad_U_x_LES',
-                         # 'grad_V_x_LES',
-                         # 'grad_W_x_LES',
-                         # 'grad_U_y_LES',
-                         # 'grad_V_y_LES',
-                         # 'grad_W_y_LES',
-                         # 'grad_U_z_LES',
-                         # 'grad_V_z_LES',
-                         # 'grad_W_z_LES',
-                         'UP_delta',
+                       'UP_delta',
                          'SGS_flux',
                          'c_prime',
                          'Delta_LES',
-                          'filter_width'
+                         'filter_width'
                          ]
 
         # reshape and crop the list that is to be written to file
@@ -3914,7 +3898,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
             output_test.append(this_test)
 
         # delete some variables to free memory
-        del output_list, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES,
+        del output_list, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES, grad_c_tilde_x_LES, grad_c_tilde_y_LES, grad_c_tilde_z_LES,
 
         print('Del output')
 
@@ -4045,8 +4029,13 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
         # filter the c and rho field
         print('Filtering c field ')
         #self.rho_filtered = self.apply_filter(self.rho_data_np)
-        self.c_filtered = self.apply_filter(self.c_data_np)
+        self.c_bar = self.apply_filter(self.c_data_np)
         self.rho_filtered = self.apply_filter(self.rho_data_np)
+        self.rho_c_filtered = self.apply_filter(self.rho_c_data_np)
+
+        print('Computing c_tilde')
+        self.c_tilde = self.rho_c_filtered/ self.rho_filtered
+
 
         print('Filtering U components')
         self.U_bar = self.apply_filter(self.U)
@@ -4054,7 +4043,10 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
         self.W_bar = self.apply_filter(self.W)
 
         print('Computing x,y,z gradients of c_bar on LES mesh')
-        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = np.gradient(self.c_filtered,int(self.filter_width))
+        grad_c_x_LES, grad_c_y_LES, grad_c_z_LES = np.gradient(self.c_bar,int(self.filter_width))
+
+        print('Computing x,y,z gradients of c_tilde on LES mesh')
+        grad_c_tilde_x_LES, grad_c_tilde_y_LES, grad_c_tilde_z_LES = np.gradient(self.c_tilde,int(self.filter_width))
 
         print('Compute UP_delta')
         self.compute_UP_delta()
@@ -4093,15 +4085,18 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
         mag_U = np.sqrt(self.U_bar**2 + self.V_bar**2 + self.W_bar**2)
         mag_grad_c = np.sqrt(grad_c_x_LES**2 + grad_c_y_LES**2 + grad_c_z_LES**2)
 
-        sum_U = np.absolute(self.U_bar) + np.absolute(self.V_bar)+np.absolute(self.W_bar)
-        sum_c = np.absolute(grad_c_x_LES) + np.absolute(grad_c_y_LES) +np.absolute(grad_c_z_LES)
+        mag_grad_c_tilde = np.sqrt(grad_c_tilde_x_LES**2 + grad_c_tilde_y_LES**2 + grad_c_tilde_z_LES**2)
+
+        # sum_U = np.absolute(self.U_bar) + np.absolute(self.V_bar)+np.absolute(self.W_bar)
+        # sum_c = np.absolute(grad_c_x_LES) + np.absolute(grad_c_y_LES) +np.absolute(grad_c_z_LES)
 
         grad_U = np.sqrt(grad_U_x_LES**2 + grad_U_y_LES**2 +grad_U_z_LES**2)
         grad_V = np.sqrt(grad_V_x_LES**2 + grad_V_y_LES**2 +grad_V_z_LES**2)
         grad_W = np.sqrt(grad_W_x_LES**2 + grad_W_y_LES**2 +grad_W_z_LES**2)
 
         mag_grad_U = np.sqrt(grad_U**2 + grad_V**2 + grad_W**2)
-        sum_grad_U = np.absolute(grad_U) + np.absolute(grad_V) + np.absolute(grad_W)
+        
+        #sum_grad_U = np.absolute(grad_U) + np.absolute(grad_V) + np.absolute(grad_W)
 
         del grad_U, grad_V, grad_W
 
@@ -4138,64 +4133,67 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
         lambda_1 = lambda_1.reshape(self.Nx,self.Ny, self.Nz)
         lambda_3 = lambda_3.reshape(self.Nx,self.Ny, self.Nz)
 
-        # features of Junsu
-        omega_x = Anti[1, 2,:] - Anti[2, 1,:]
-        omega_y = Anti[0, 2,:] - Anti[2, 0,:]
-        omega_z = Anti[0, 1,:] - Anti[1, 0,:]
+        # # features of Junsu
+        # omega_x = Anti[1, 2,:] - Anti[2, 1,:]
+        # omega_y = Anti[0, 2,:] - Anti[2, 0,:]
+        # omega_z = Anti[0, 1,:] - Anti[1, 0,:]
 
-        # Magnitude of vorticity and strain
-        mag_vor = np.sqrt(omega_x * omega_x + omega_y * omega_y + omega_z * omega_z)
-        mag_strain = np.sqrt(Strain[0, 0, :] * Strain[0, 0, :] + Strain[1, 1, :] * Strain[1, 1, :] + Strain[2, 2, :] * Strain[2, 2, :])
+        # # Magnitude of vorticity and strain
+        # mag_vor = np.sqrt(omega_x * omega_x + omega_y * omega_y + omega_z * omega_z)
+        # mag_strain = np.sqrt(Strain[0, 0, :] * Strain[0, 0, :] + Strain[1, 1, :] * Strain[1, 1, :] + Strain[2, 2, :] * Strain[2, 2, :])
 
-        # convert to 3D
-        mag_vor = mag_vor.reshape(self.Nx,self.Ny,self.Nz)
-        mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
+        # # convert to 3D
+        # mag_vor = mag_vor.reshape(self.Nx,self.Ny,self.Nz)
+        # mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
 
         # Delete some variables to freememory
         del omega_x, omega_y, omega_z, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES,
 
         # #creat dask array and reshape all data
-        output_list =[self.c_filtered,
-                                    self.omega_DNS_filtered,
-                                    self.omega_model_cbar,
-                                    mag_U,
-                                    mag_grad_U,
-                                    mag_grad_c,
-                                    mag_strain,
-                                    mag_vor,
-                                    lambda_1,
-                                    lambda_3,
-                                    sum_U,
-                                    sum_c,
-                                    sum_grad_U,
+        output_list =[      self.c_bar,
+                                 self.c_tilde,
+                                  self.omega_DNS_filtered,
+                                  self.omega_model_cbar,
+                                 #self.rho_filtered/self.rho_filtered.max(),     # rho/rho_unburned
+                                  mag_U,
+                                  mag_grad_U,
+                                  mag_grad_c,
+                                  mag_grad_c_tilde,
+                                  #mag_strain,
+                                  #mag_vor,
+                                  lambda_1,
+                                  lambda_3,
                                     self.UP_delta,
                                     self.SGS_scalar_flux,
                                     self.c_prime,
                                     # add the filter width as information and perturb it slightly
                                     np.ones((self.Nx,self.Ny,self.Nz))*self.Delta_LES +
                                         (np.random.rand(self.Nx,self.Ny,self.Nz)*1e-6),
-                                    np.ones((self.Nx, self.Ny, self.Nz)) * self.filter_width
+                                    np.ones((self.Nx, self.Ny, self.Nz)) * self.filter_width,
+
+                                    self.omega_DNS
                                   ]
 
         output_names =['c_bar',
-                         # 'mag_grad_c_bar',
-                         'omega_DNS_filtered',
-                         'omega_model_planar',
-                        'mag_U',
-                        'mag_grad_U',
-                        'mag_grad_c',
-                        'mag_strain',
-                        'mag_vorticity',   # magnitude vorticity
-                        'lambda_1',
-                        'lambda_3',
-                        'sum_U',
-                        'sum_c',
-                        'sum_grad_U',
-                        'UP_delta',
-                         'SGS_flux',
-                         'c_prime',
-                         'Delta_LES',
-                          'filter_width'
+                       'c_tilde',
+                       'omega_DNS_filtered',
+                       'omega_model_planar',
+                       # 'rho_ratio',
+                       # 'mag_U',
+                       'mag_grad_U',
+                       'mag_grad_c',
+                       'mag_grad_c_tilde',
+                       # 'mag_strain',
+                       # 'mag_vorticity',   # magnitude vorticity
+                       'lambda_1',
+                       'lambda_3',
+                       'UP_delta',
+                       'SGS_flux',
+                       'c_prime',
+                       'Delta_LES',
+                       'filter_width'
+
+                       'omega_DNS'
                          ]
 
 
