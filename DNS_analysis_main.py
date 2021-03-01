@@ -241,7 +241,7 @@ class dns_analysis_base(object):
             return data_filtered
 
         elif self.filter_type == 'TOPHAT':
-            data_filtered = sp.ndimage.filters.uniform_filter(data, [self.filter_width,self.filter_width,self.filter_width],mode='wrap')
+            data_filtered = sp.ndimage.filters.uniform_filter(data, [self.filter_width,self.filter_width,self.filter_width],mode='reflect')
             return data_filtered
 
         elif self.filter_type == 'TOPHAT_REFLECT':
@@ -3784,6 +3784,15 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         mag_grad_c_tilde = np.sqrt(grad_c_tilde_x_LES**2 + grad_c_tilde_y_LES**2 + grad_c_tilde_z_LES**2)
 
+        # compute the normal vectors
+        NORX_LES = - grad_c_tilde_x_LES / mag_grad_c_tilde
+        NORY_LES = - grad_c_tilde_y_LES / mag_grad_c_tilde
+        NORZ_LES = - grad_c_tilde_z_LES / mag_grad_c_tilde
+
+        # compute angles
+        theta = np.arccos(NORZ_LES)
+        phi = np.arcsin(NORY_LES / np.sin(theta))
+
         # sum_U = np.absolute(self.U_bar) + np.absolute(self.V_bar)+np.absolute(self.W_bar)
         # sum_c = np.absolute(grad_c_x_LES) + np.absolute(grad_c_y_LES) +np.absolute(grad_c_z_LES)
 
@@ -3842,7 +3851,8 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
         # mag_vor = mag_vor.reshape(self.Nx,self.Ny,self.Nz)
         # mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
 
-        del omega_x, omega_y, omega_z
+        # Delete some variables to freememory
+        #del grad_c_x_LES, grad_c_y_LES, grad_c_z_LES,
 
         # #creat dask array and reshape all data
         output_list =[           self.c_bar,
@@ -3854,6 +3864,11 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                                   mag_grad_U,
                                   mag_grad_c,
                                   mag_grad_c_tilde,
+                                 #NORX_LES,
+                                 #NORY_LES,
+                                 #NORZ_LES,
+                                 theta,
+                                 phi,
                                   #mag_strain,
                                   #mag_vor,
                                   lambda_1,
@@ -3876,6 +3891,11 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                        'mag_grad_U',
                        'mag_grad_c',
                        'mag_grad_c_tilde',
+                       #'norm_c_tilde_x',
+                       #'norm_c_tilde_y',
+                       #'norm_c_tilde_z',
+                       'theta',
+                       'phi',
                        # 'mag_strain',
                        # 'mag_vorticity',   # magnitude vorticity
                        'lambda_1',
@@ -4085,7 +4105,17 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
         mag_U = np.sqrt(self.U_bar**2 + self.V_bar**2 + self.W_bar**2)
         mag_grad_c = np.sqrt(grad_c_x_LES**2 + grad_c_y_LES**2 + grad_c_z_LES**2)
 
+        # absolute value of c_tilde gradient
         mag_grad_c_tilde = np.sqrt(grad_c_tilde_x_LES**2 + grad_c_tilde_y_LES**2 + grad_c_tilde_z_LES**2)
+
+        # compute the normal vectors
+        NORX_LES = - grad_c_tilde_x_LES / mag_grad_c_tilde
+        NORY_LES = - grad_c_tilde_y_LES / mag_grad_c_tilde
+        NORZ_LES = - grad_c_tilde_z_LES / mag_grad_c_tilde
+
+        # compute angles
+        theta = np.arccos(NORZ_LES)
+        phi = np.arcsin(NORY_LES / np.sin(theta))
 
         # sum_U = np.absolute(self.U_bar) + np.absolute(self.V_bar)+np.absolute(self.W_bar)
         # sum_c = np.absolute(grad_c_x_LES) + np.absolute(grad_c_y_LES) +np.absolute(grad_c_z_LES)
@@ -4147,7 +4177,7 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
         # mag_strain = mag_strain.reshape(self.Nx, self.Ny, self.Nz)
 
         # Delete some variables to freememory
-        del omega_x, omega_y, omega_z, grad_c_x_LES, grad_c_y_LES, grad_c_z_LES,
+        del grad_c_x_LES, grad_c_y_LES, grad_c_z_LES,
 
         # #creat dask array and reshape all data
         output_list =[      self.c_bar,
@@ -4155,10 +4185,15 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
                                   self.omega_DNS_filtered,
                                   self.omega_model_cbar,
                                  #self.rho_filtered/self.rho_filtered.max(),     # rho/rho_unburned
-                                  mag_U,
+                                 # mag_U,
                                   mag_grad_U,
                                   mag_grad_c,
                                   mag_grad_c_tilde,
+                                   # NORX_LES,
+                                    #NORY_LES,
+                                    #NORZ_LES,
+                                    theta,
+                                    phi,
                                   #mag_strain,
                                   #mag_vor,
                                   lambda_1,
@@ -4183,6 +4218,11 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
                        'mag_grad_U',
                        'mag_grad_c',
                        'mag_grad_c_tilde',
+                       #'norm_c_tilde_x',
+                       #'norm_c_tilde_y',
+                       #'norm_c_tilde_z',
+                       'theta',
+                       'phi',
                        # 'mag_strain',
                        # 'mag_vorticity',   # magnitude vorticity
                        'lambda_1',
@@ -4191,7 +4231,7 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
                        'SGS_flux',
                        'c_prime',
                        'Delta_LES',
-                       'filter_width'
+                       'filter_width',
 
                        'omega_DNS'
                          ]
