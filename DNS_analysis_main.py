@@ -3686,6 +3686,51 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         return Strain, Anti
 
+    
+    def compute_omega_oblique(self):
+        '''
+        Computes the omega oblique source term according to Pfitzner
+        '''
+
+        print('Computing omega_oblique...')
+
+        # 1st: read in the omega tables for the interpolation according to c_bar and Delta_xi
+        
+        # HARDCODED
+        path_omega_interpolation = '/home/max/Python/DNS_Data_Klein/omega_interploation_database'
+
+        # check if directory exists
+        try:
+            os.path.exists(path_omega_interpolation)
+        except AssertionError:
+            print('Check if this path exists: ',path_omega_interpolation)
+            sys.exit('Exit due to errors!')
+
+        c_grid = np.load(join(path_omega_interpolation,'c_grid.npy'))
+        omega_array = np.load(join(path_omega_interpolation,'omega_array.npy'))
+        delta_xi_grid = np.load(join(path_omega_interpolation,'delta_xi_grid.npy'))
+
+        # the delta index is here a fixed value as it is constant for each dataset
+        delta_xi = self.filter_width * 1.792 / 11.14      # Ändert sich 11.14 bei UPRIME15???
+        index_delta = np.argmin(np.abs(delta_xi_grid - delta_xi))
+
+        #print('Shape c_bar: ',self.c_bar.shape)
+
+        c_bar_vec = self.c_bar.reshape(self.Nx * self.Ny * self.Nz)
+
+        # set up a new empty array for omega_oblique
+        omega_oblique = c_bar_vec.copy() * 0.0
+       
+        # loop over c_bar values
+        for idx, c in enumerate(c_bar_vec):
+            index_c = np.argmin(np.abs(c_grid - c))
+            
+            omega_oblique[idx] = omega_array[index_delta,index_c]
+
+        # return the 3D array
+        return omega_oblique.reshape(self.Nx,self.Ny,self.Nz)
+
+
 
     def run_analysis_DNN(self,filter_width ,filter_type, c_analytical=False):
         '''
@@ -3820,23 +3865,27 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         print('Computing S and R')
         # symetric strain
-        Strain = 0.5*(gradient_tensor + np.transpose(gradient_tensor,(1,0,2)))
+        #Strain = 0.5*(gradient_tensor + np.transpose(gradient_tensor,(1,0,2)))
         #anti symetric strain
-        Anti =  0.5*(gradient_tensor - np.transpose(gradient_tensor,(1,0,2)))
+        #Anti =  0.5*(gradient_tensor - np.transpose(gradient_tensor,(1,0,2)))
 
         del gradient_tensor
 
         print('Computing lambdas')
 
-        lambda_1 = np.trace(Strain**2)
+        #lambda_1 = np.trace(Strain**2)
         #lambda_2 = np.trace(Anti**2)
-        lambda_3 = np.trace(Strain**3)
+        #lambda_3 = np.trace(Strain**3)
         #lambda_4 = np.trace(Anti**2 * Strain)
         #lambda_5 = np.trace(Anti**2 * Strain**2)
 
         # convert to 3D
-        lambda_1 = lambda_1.reshape(self.Nx,self.Ny, self.Nz)
-        lambda_3 = lambda_3.reshape(self.Nx,self.Ny, self.Nz)
+        #lambda_1 = lambda_1.reshape(self.Nx,self.Ny, self.Nz)
+        #lambda_3 = lambda_3.reshape(self.Nx,self.Ny, self.Nz)
+
+
+        # computing omega_oblique
+        omega_oblique = self.compute_omega_oblique()
 
         # # features of Junsu
         # omega_x = Anti[1, 2,:] - Anti[2, 1,:]
@@ -3859,6 +3908,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                                  self.c_tilde,
                                   self.omega_DNS_filtered,
                                   self.omega_model_cbar,
+                                  omega_oblique,
                                  # self.rho_filtered/self.rho_filtered.max(),
                                  # mag_U,
                                   mag_grad_U,
@@ -3867,12 +3917,12 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                                  #NORX_LES,
                                  #NORY_LES,
                                  #NORZ_LES,
-                                 theta,
-                                 phi,
+                                 #theta,
+                                 #phi,
                                   #mag_strain,
                                   #mag_vor,
-                                  lambda_1,
-                                  lambda_3,
+                                  #lambda_1,
+                                  #lambda_3,
                                     self.UP_delta,
                                     self.SGS_scalar_flux,
                                     self.c_prime,
@@ -3886,6 +3936,7 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                          'c_tilde',
                          'omega_DNS_filtered',
                          'omega_model_planar',
+                         'omega_oblique',
                        #'rho_ratio',
                        #'mag_U',
                        'mag_grad_U',
@@ -3894,12 +3945,12 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
                        #'norm_c_tilde_x',
                        #'norm_c_tilde_y',
                        #'norm_c_tilde_z',
-                       'theta',
-                       'phi',
+                       #'theta',
+                       #'phi',
                        # 'mag_strain',
                        # 'mag_vorticity',   # magnitude vorticity
-                       'lambda_1',
-                       'lambda_3',
+                       #'lambda_1',
+                       #'lambda_3',
                        'UP_delta',
                          'SGS_flux',
                          'c_prime',
@@ -4162,6 +4213,9 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
         # convert to 3D
         lambda_1 = lambda_1.reshape(self.Nx,self.Ny, self.Nz)
         lambda_3 = lambda_3.reshape(self.Nx,self.Ny, self.Nz)
+
+
+        # compute omega_oblique
 
         # # features of Junsu
         # omega_x = Anti[1, 2,:] - Anti[2, 1,:]
