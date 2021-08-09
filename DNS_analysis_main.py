@@ -237,7 +237,7 @@ class dns_analysis_base(object):
 
         if self.filter_type == 'GAUSS':
             self.sigma_xyz = [int(self.filter_width/2), int(self.filter_width/2) ,int(self.filter_width/2)]
-            data_filtered = sp.ndimage.filters.gaussian_filter(data, self.sigma_xyz, truncate=1.0, mode='wrap')
+            data_filtered = sp.ndimage.filters.gaussian_filter(data, self.sigma_xyz, truncate=1.0, mode='reflect')
             return data_filtered
 
         elif self.filter_type == 'TOPHAT':
@@ -3980,7 +3980,11 @@ class dns_analysis_prepareDNN(dns_analysis_dirac_FSD_alt):
 
         case_name = self.case.split('/')[1]
 
-        filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_DNN_'+case_name)
+
+        if self.filter_type == 'GAUSS':
+            filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_GAUSS_DNN_'+case_name)
+        else:
+            filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_DNN_'+case_name)
 
         dataArray_train_dd = dd.io.from_dask_array(dataArray_train_da,columns=output_names)
         dataArray_test_dd = dd.io.from_dask_array(dataArray_test_da, columns=output_names)
@@ -4312,7 +4316,10 @@ class dns_analysis_writeSlices(dns_analysis_prepareDNN):
 
             case_name = self.case.split('/')[1]
 
-            filename = join(self.case, 'postProcess_DNN/slice_plane_'+p+'_'+ str(self.filter_width) + '_DNN_'+case_name)
+            if self.filter_type == 'GAUSS':
+                filename = join(self.case, 'postProcess_DNN/filter_width_'  + str(self.filter_width) + '_GAUSS_DNN_'+case_name)
+            else:
+                filename = join(self.case, 'postProcess_DNN/slice_plane_'+p+'_'+ str(self.filter_width) + '_DNN_'+case_name)
 
             dataArray_dd = dd.io.from_dask_array(dataArray_da,columns=output_names)
 
